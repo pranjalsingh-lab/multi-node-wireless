@@ -1,19 +1,15 @@
 # Backend image: the Node/Express control plane + the Renode simulation engine.
 #
 # Renode needs a full Linux userland (Mono/.NET runtime + system libs), which is
-# exactly why this can't run on a serverless platform. We start from Antmicro's
-# official Renode image (engine + all its dependencies preinstalled) and add
-# Node.js on top, so the whole thing is self-contained and reproducible.
-FROM antmicro/renode:latest
+# why this can't run serverless. The official Renode image already solves all of
+# that — but its base OS is old, so running apt inside it fails. So we do all the
+# fetching/installing in a clean Debian build stage and copy the results in.
 
-# The base image sets an ENTRYPOINT (renode). Clear it so our CMD runs as-is.
-ENTRYPOINT []
+# ---- build stage: Node runtime, app deps, and firmware (apt works here) ------
+FROM node:20-bullseye-slim AS build
 
-# Node.js 20 (app needs 18+) plus tools used at build/runtime.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      curl ca-certificates procps \
- && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
- && apt-get install -y --no-install-recommends nodejs \
+      curl ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /srv
@@ -25,13 +21,32 @@ RUN cd app && npm install --omit=dev --no-audit --no-fund
 # App source.
 COPY app ./app
 
-# Default firmware images — the same files setup.sh fetches. Uploaded firmware
-# lands in firmware/uploads at runtime (ephemeral; resets on redeploy).
+# Default firmware images — the same files setup.sh fetches.
 RUN mkdir -p firmware/defaults firmware/uploads \
  && DL="https://dl.antmicro.com/projects/renode" \
  && curl -L --retry 3 "$DL/nrf52840--zephyr-bluetooth_central_hr.elf-s_3380332-316e27f81dcda3c2b0e7f2c3516001e7b27ad051"   -o firmware/defaults/gateway.elf \
  && curl -L --retry 3 "$DL/nrf52840--zephyr-bluetooth_peripheral_hr.elf-s_3217940-7b59adc9629f8be90067b131e663a13d2d4bb711" -o firmware/defaults/heartrate.elf \
  && curl -L --retry 3 "$DL/nrf52840--zephyr_adxl372_spi.elf-s_993780-1dedb945dae92c07f1b4d955719bfb1f1e604173"            -o firmware/defaults/motion.elf
+
+# ---- runtime stage: Renode engine + the Node runtime copied in ---------------
+FROM antmicro/renode:latest
+
+# The base image sets an ENTRYPOINT (renode). Clear it so our CMD runs as-is.
+ENTRYPOINT []
+
+# Bring in the Node.js runtime + npm from the build stage — no apt needed here.
+# (node from bullseye/glibc 2.31 runs on the Renode base; if you ever hit a
+# "GLIBC_… not found" error, the base is older than expected — tell me and I'll
+# switch to fetching the standalone Node tarball instead.)
+COPY --from=build /usr/local/bin/node /usr/local/bin/node
+COPY --from=build /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+ && ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+
+WORKDIR /srv
+
+# App + deps + firmware, already assembled in the build stage.
+COPY --from=build /srv /srv
 
 ENV NODE_ENV=production
 # server.js finds the engine via `which renode` (on PATH in this base image).
