@@ -1,4 +1,4 @@
-// Backend (API) base URL — read by index.html before it makes any request.
+// Backend (API) base URL - read by index.html before it makes any request.
 //
 // Local dev (the backend serves this page itself): leave empty → same origin.
 // Production (this page on Vercel, API on Render/Railway/Fly): set the full

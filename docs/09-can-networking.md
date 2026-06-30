@@ -1,10 +1,10 @@
-# 09 — CAN Networking & Multi-Node Vehicle Buses
+# 09 - CAN Networking & Multi-Node Vehicle Buses
 
 > How Renode models a CAN bus, connects multiple ECUs onto it, transports frames,
 > arbitrates (and where it *doesn't*), and lets you stimulate, observe, and bridge the
-> bus to the real world. Written against an automotive/EV use case — a BMS, motor
+> bus to the real world. Written against an automotive/EV use case - a BMS, motor
 > controller, driver-control unit, and telemetry module exchanging heartbeats and data
-> frames — but the machinery is generic.
+> frames - but the machinery is generic.
 >
 > Every claim is cited to source at the bottom (`file:line`). Verified against the
 > `renode/` tree and the `renode-infrastructure/` submodule clone at
@@ -25,7 +25,7 @@ firmware**, not in Renode. Renode's job is two layers below that:
 2. faithfully **transport `CANMessageFrame`s** between every controller attached to a bus.
 
 The hub never interprets an arbitration ID. It carries the frame; the firmware on each
-node decides what to send and what to accept. Keep this split in mind — most "does Renode
+node decides what to send and what to accept. Keep this split in mind - most "does Renode
 support X?" questions resolve cleanly once you ask *"is X a property of the wire, the
 controller, or the firmware?"*
 
@@ -44,7 +44,7 @@ controller, or the firmware?"*
 
 ---
 
-## 1. The object model — four layers
+## 1. The object model - four layers
 
 | Layer | Type | Role | Source |
 |---|---|---|---|
@@ -59,16 +59,16 @@ bridge out to your host OS. They are interchangeable from the hub's point of vie
 
 ---
 
-## 2. `CANMessageFrame` — the unit of transport
+## 2. `CANMessageFrame` - the unit of transport
 
 A frame carries everything CAN/CAN-FD needs (`CANMessageFrame.cs`):
 
 | Member | Meaning |
 |---|---|
 | `Id` | 11-bit standard or 29-bit extended arbitration ID (`StandardIdWidth = 11`, `ExtendedIdWidth = 29`). Your `0x402`, `0x600`, `0x601`… are just this value. |
-| `Data` | payload bytes — up to 8 (classic) or 64 (CAN-FD). |
+| `Data` | payload bytes - up to 8 (classic) or 64 (CAN-FD). |
 | `ExtendedFormat` | standard (11-bit) vs extended (29-bit) ID. |
-| `RemoteFrame` | RTR — remote request frame. |
+| `RemoteFrame` | RTR - remote request frame. |
 | `FDFormat` | CAN-FD frame. |
 | `BitRateSwitch` | CAN-FD BRS (data-phase bit-rate switch). |
 | `DataAsHex` | pretty-printed payload, used in logs. |
@@ -79,11 +79,11 @@ handles the standard/extended bit-shifting; `ExtendedId` / `StandardIdPart` /
 for the host bridge (§8).
 
 > **Implication:** a "message type" in your protocol *is* a `CANMessageFrame.Id`. Renode
-> imposes no schema on `Data` — a DBC/signal layout is entirely a firmware/tooling concern.
+> imposes no schema on `Data` - a DBC/signal layout is entirely a firmware/tooling concern.
 
 ---
 
-## 3. Wiring nodes onto a bus — the `.resc` commands
+## 3. Wiring nodes onto a bus - the `.resc` commands
 
 Two Monitor commands build an entire network:
 
@@ -95,14 +95,14 @@ connector Connect sysbus.can0 canHub     # plug a controller into it
 - `CreateCANHub` is an `Emulation` extension: `CreateCANHub(name, loopback = false,
   useNetworkByteOrderForLogging = true)` (`CANHub.cs:26`). `loopback = false` means a
   sender does **not** receive its own frames (the real-bus default); `true` echoes them
-  back — occasionally handy for single-node tests.
+  back - occasionally handy for single-node tests.
 - `connector Connect <iface> <hub>` attaches any `ICAN` to the hub. The interface can be
   named by its sysbus path (`sysbus.can0`) or a bare alias (`fdcan1`).
 
-### The canonical multi-node example — RAMN (4 ECUs on one bus)
+### The canonical multi-node example - RAMN (4 ECUs on one bus)
 
 `scripts/multi-node/ramn.resc` is the reference topology and the closest in-tree analogue
-to a vehicle bus (it runs Toyota's real RAMN firmware — four ECUs named
+to a vehicle bus (it runs Toyota's real RAMN firmware - four ECUs named
 GATEWAY / CHASSIS / POWERTRAIN / BODY):
 
 ```
@@ -130,7 +130,7 @@ emulation SetGlobalQuantum "0.00001"          # tighten sync for CAN responsiven
 The per-node `single-node/ramn.resc` is parameterized by `$global.name`: it does
 `mach create $name`, includes the board `.repl`, then selects the matching firmware ELF
 and personality `.repl`. **This is exactly the pattern for a BMS/MC/DCU/telemetry network**
-— one `single-node` script per ECU role, included once per node, each `connector
+- one `single-node` script per ECU role, included once per node, each `connector
 Connect`'d to the same hub.
 
 ---
@@ -153,11 +153,11 @@ eight FlexCAN instances to a hub: `connector Connect sysbus.can0 canHub`.
 
 ---
 
-## 5. Arbitration — read this carefully (two layers, only one modeled)
+## 5. Arbitration - read this carefully (two layers, only one modeled)
 
 "Who does CAN arbitration?" has a layered answer in Renode.
 
-### 5a. Local (intra-controller) arbitration — **modeled**
+### 5a. Local (intra-controller) arbitration - **modeled**
 
 The FlexCAN model decides which of *its own* pending TX mailboxes transmits next.
 `RunArbitrationProcess()` either iterates buffers in index order when **Lowest Buffer
@@ -167,7 +167,7 @@ order (`S32K3XX_FlexCAN.cs:405,424,434`). This faithfully reproduces the real Fl
 *local* mailbox arbitration. So **within a single node**, "which of my queued frames goes
 first" behaves correctly.
 
-### 5b. Bus-level (inter-node) arbitration — **NOT modeled**
+### 5b. Bus-level (inter-node) arbitration - **NOT modeled**
 
 On real hardware, arbitration is a **distributed, emergent, bit-by-bit** physical-layer
 process: every transmitter watches the wire while it sends, dominant bits beat recessive
@@ -184,16 +184,16 @@ same bit-time**. Consequently:
 | Real CAN behavior | In Renode |
 |---|---|
 | Bit-by-bit dominant/recessive contention | ❌ not modeled |
-| Lowest ID wins *across nodes* | ❌ — delivery order is scheduler order, **not** ID priority |
+| Lowest ID wins *across nodes* | ❌ - delivery order is scheduler order, **not** ID priority |
 | Destructive collision / lost arbitration | ❌ no frame is ever lost to contention |
 | Automatic retransmit on arbitration loss | ❌ |
 | Error frames, TEC/REC counters driven by bus contention | ❌ |
 | Busload-dependent frame latency / jitter | ❌ (fidelity is frame/event-level, not bit-level) |
-| **Acceptance filtering by ID (what each node receives)** | ✅ faithful — firmware RX filters/mailboxes |
+| **Acceptance filtering by ID (what each node receives)** | ✅ faithful - firmware RX filters/mailboxes |
 | **Local mailbox TX priority within one controller** | ✅ faithful (§5a) |
 
 **Net:** the FlexCAN arbitrates among *its own* mailboxes; the hub does **no** inter-node
-arbitration — it is a perfect, ordered, collision-free broadcast bus.
+arbitration - it is a perfect, ordered, collision-free broadcast bus.
 
 ### What this means in practice
 
@@ -203,7 +203,7 @@ arbitration — it is a perfect, ordered, collision-free broadcast bus.
 - ⚠️ **Bus-contention physics is not faithful.** Anything depending on priority inversion,
   arbitration-loss timing, retransmission jitter, error-counter escalation, or latency
   under bus saturation will **not** reproduce real behavior out of the box.
-- If you need that, you'd extend the hub yourself — e.g. queue concurrent transmits within
+- If you need that, you'd extend the hub yourself - e.g. queue concurrent transmits within
   a bit-time window and resolve by ID, and synthesize bus-error/back-off behavior. It is
   not built in. (Flagged here as a known boundary; see §11.)
 
@@ -213,31 +213,31 @@ arbitration — it is a perfect, ordered, collision-free broadcast bus.
 
 CAN behavior depends on every node's clock being coherent. Two Monitor knobs govern this:
 
-- `emulation SetGlobalQuantum "<seconds>"` — the synchronization granularity. Tighter =
+- `emulation SetGlobalQuantum "<seconds>"` - the synchronization granularity. Tighter =
   more faithful inter-node timing, slower wall-clock. The RAMN multi-node script uses
   `0.00001` (10 µs); the FlexCAN test uses `0.000025` (25 µs).
-- `emulation SetGlobalSerialExecution True` — forces strictly serialized node execution,
+- `emulation SetGlobalSerialExecution True` - forces strictly serialized node execution,
   used by the FlexCAN test for fully deterministic frame ordering
   (`tests/peripherals/S32K3XX_FlexCAN.robot`).
 
 Heartbeats are simply periodic frames: under real firmware they come off the node's own
 timers; under host stimulation (§7) you emit them from a loop. Because timing is
-deterministic, a **dropped-heartbeat → timeout → fault** sequence is fully reproducible —
+deterministic, a **dropped-heartbeat → timeout → fault** sequence is fully reproducible -
 the main reason to test BMS safety logic here rather than on a flaky bench.
 
 ---
 
-## 7. Stimulating & testing the bus without firmware — `CANTester`
+## 7. Stimulating & testing the bus without firmware - `CANTester`
 
 You don't need every ECU's firmware to start. `CANTester` is a host-side virtual node that
 implements `ICAN`, so it plugs onto the hub like any controller (`CANTester.cs`):
 
-- `SendFrame(CANMessageFrame)` — inject an arbitrary frame (e.g. a synthetic `0x402` MC
+- `SendFrame(CANMessageFrame)` - inject an arbitrary frame (e.g. a synthetic `0x402` MC
   heartbeat) onto the bus (`CANTester.cs:214`).
-- `WaitForMessageFrame(CANMatcher, …)` — block until a matching frame appears
+- `WaitForMessageFrame(CANMatcher, …)` - block until a matching frame appears
   (`CANTester.cs:224`). `CANMatcher(singleId: 0x600)` matches by exact ID
   (`CANTester.cs:312`).
-- ISO-TP / UDS helpers — `SendISOTPMessage`, `WaitForISOTPMessage`,
+- ISO-TP / UDS helpers - `SendISOTPMessage`, `WaitForISOTPMessage`,
   `SendUDSCommandAndWaitForPositiveResponse` for multi-frame transport and diagnostics
   (`CANTester.cs:49`).
 
@@ -253,28 +253,28 @@ These are exposed as **Robot Framework keywords** for automated tests
 | `Set Default CAN Timeout` | tune the wait timeout |
 
 So you can bring up **just the BMS node**, inject a fake MC heartbeat, and assert the BMS
-broadcasts `0x600/0x601/0x602` correctly — before any other ECU exists. The FlexCAN Robot
+broadcasts `0x600/0x601/0x602` correctly - before any other ECU exists. The FlexCAN Robot
 suite is a working template: it does `emulation CreateCANHub "${CAN_HUB}" False`, includes
 a per-node `.resc`, then `connector Connect ${CAN} ${CAN_HUB}`
 (`tests/peripherals/S32K3XX_FlexCAN.robot:11–19`).
 
 ---
 
-## 8. Observability — watching the bus like a sniffer
+## 8. Observability - watching the bus like a sniffer
 
 - **Wireshark.** `CANHub` implements `INetworkLog<ICAN>`, and the Wireshark plugin exposes
   `emulation CreateWiresharkForCAN "<name>"` plus `LogToWireshark`
-  (`INetworkLogExtensions.cs:31,41`). You get a live capture of every frame — watch
+  (`INetworkLogExtensions.cs:31,41`). You get a live capture of every frame - watch
   `0x600/0x601/0x602` scroll exactly like candump or PCAN-View.
 - **Logging.** The hub logs each `sender → message` at `Debug` level out of the box
   (`CANHub.cs` `Transmit`, the `this.Log(LogLevel.Debug, …)` call).
 - **Events for custom decoders/assertions.** `CANHub` raises `FrameReceived` (sender →
   hub), `FrameProcessed` (frame accepted for distribution), and `FrameTransmitted` (hub →
-  each receiver) — `CANHub.cs:92–96`. Hook these to decode signals or build invariants.
+  each receiver) - `CANHub.cs:92–96`. Hook these to decode signals or build invariants.
 
 ---
 
-## 9. Bridging to the real world — SocketCAN
+## 9. Bridging to the real world - SocketCAN
 
 `CANHub` can be tied to a host SocketCAN interface so **real tools see the emulated bus**:
 
@@ -291,7 +291,7 @@ connector Connect socketcan canHub          # bridge is just another ICAN on the
 `CANMessageFrame.ToSocketCAN` / `TryFromSocketCAN`.)
 
 Once bridged, `candump`, `cangen`, `python-can`, BusMaster, or your actual telemetry
-backend interact with the emulated BMS as if it were physical hardware — so a telemetry
+backend interact with the emulated BMS as if it were physical hardware - so a telemetry
 module or DCU dashboard can even run as a host process consuming the emulated frames
 upstream. (Linux SocketCAN / `vcan` only.)
 
@@ -308,7 +308,7 @@ lm74:    Sensors.TI_LM74 @ spi0              # SPI chip-select / bus
 si7021:  Sensors.SI70xx  @ i2c 5
 ```
 
-(Real registrations from in-tree platforms — note I2C devices take an address, SPI devices
+(Real registrations from in-tree platforms - note I2C devices take an address, SPI devices
 register on the SPI controller; sub-devices can chain off a parent, e.g. a magnetometer
 `@ icm 0xC`.)
 
@@ -341,7 +341,7 @@ covered in `03-csharp-peripherals.md`; registering it in a `.repl` in `01-repl-f
 | DCU displays / telemetry forwards | another hub node, or a host process over the SocketCAN bridge |
 | Sniff / verify the bus | `CreateWiresharkForCAN`, hub `Debug` logs, `Wait For Frame With Id` |
 | Sensors on a node | `Sensors.*` models registered on `i2c`/`spi`/`uart` (§10) |
-| Bus arbitration / priority under load | ⚠️ **not modeled at bit level** — see §5b |
+| Bus arbitration / priority under load | ⚠️ **not modeled at bit level** - see §5b |
 
 ### Fidelity boundaries (consolidated)
 
@@ -430,8 +430,8 @@ connector Connect socketcan canHub
 | Sensor models + base classes; bus registration syntax | `renode-infrastructure/src/Emulator/Peripherals/Peripherals/Sensors/` (`GenericSPISensor`, `ST_I2CSensorBase`, `DummySensor`, etc.) |
 
 > **Provenance note.** §5b (no bit-level inter-node arbitration) is an inference from
-> reading `CANHub.Transmit` end-to-end — the hub forwards each frame unconditionally to all
-> non-sender interfaces with no priority comparison, contention queue, or retransmit path —
+> reading `CANHub.Transmit` end-to-end - the hub forwards each frame unconditionally to all
+> non-sender interfaces with no priority comparison, contention queue, or retransmit path -
 > cross-checked against the absence of any `arbitration`/`backoff`/`retransmit` logic in the
 > hub. The *local* FlexCAN arbitration in §5a **is** present and cited. If you later need
 > bus-contention fidelity, that gap is the thing to build (§5 "What this means").

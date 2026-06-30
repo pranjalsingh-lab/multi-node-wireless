@@ -1,15 +1,15 @@
-# 01 — The `.repl` Platform Description Format
+# 01 - The `.repl` Platform Description Format
 
 > `.repl` = **RE**node **PL**atform. A declarative description of *what hardware a
 > machine has*: each peripheral's variable name, C# type, bus address, configuration,
-> and interrupt wiring. It contains **no behavior and no firmware** — only structure.
+> and interrupt wiring. It contains **no behavior and no firmware** - only structure.
 
 > **Want to *generate* a whole platform for a chip Renode doesn't support yet?** This doc is the
-> syntax reference; the end-to-end procedure (where each line comes from — SVD vs datasheet — and
+> syntax reference; the end-to-end procedure (where each line comes from - SVD vs datasheet - and
 > how to verify it) is the capstone, [doc 06](06-generating-a-new-board.md).
 
 **Authoritative source** (all in the `renode` tree):
-- Grammar: `src/Renode/PlatformDescription/Syntax/Grammar.cs` (a [Sprache](https://github.com/sprache/Sprache) parser-combinator grammar — it *is* the spec).
+- Grammar: `src/Renode/PlatformDescription/Syntax/Grammar.cs` (a [Sprache](https://github.com/sprache/Sprache) parser-combinator grammar - it *is* the spec).
 - Indentation/comment pre-pass: `src/Renode/PlatformDescription/PreLexer.cs`.
 - Semantics (type resolution, ctor matching, registration, IRQ wiring): `src/Renode/PlatformDescription/CreationDriver.cs` (covered in [doc 04](04-repl-to-csharp-bridge.md)).
 - Syntax-node classes: `src/Renode/PlatformDescription/Syntax/*.cs`.
@@ -77,16 +77,16 @@ That is why the grammar talks about `{ }` attribute blocks and `;` separators wh
 write indentation and newlines.
 
 ### Comments
-- **`//` single-line** comment — but only when the `//` is at the start of the line or **preceded by a space** (`PreLexer.FindInLine`, `:316-321`). This is deliberate: it means `http://...` inside a value is **not** treated as a comment (the slashes are preceded by `:`/`/`, not a space). Verify: URLs appear unescaped in real `.repl`/`init:` sections.
-- **`/* ... */` multi-line** comment (`:258-285`). In indent mode a single-line `/* */` can't be the first non-whitespace element unless it spans the whole line, and a block comment must end at end-of-line — these are enforced (`:268-276`, `:213-216`).
+- **`//` single-line** comment - but only when the `//` is at the start of the line or **preceded by a space** (`PreLexer.FindInLine`, `:316-321`). This is deliberate: it means `http://...` inside a value is **not** treated as a comment (the slashes are preceded by `:`/`/`, not a space). Verify: URLs appear unescaped in real `.repl`/`init:` sections.
+- **`/* ... */` multi-line** comment (`:258-285`). In indent mode a single-line `/* */` can't be the first non-whitespace element unless it spans the whole line, and a block comment must end at end-of-line - these are enforced (`:268-276`, `:213-216`).
 
 ### Strings
-- `"..."` — single-line string. `\"` and `\\` are escapes (`Grammar.cs:139`).
-- `'''...'''` — **multi-line** string (`Grammar.cs:149-153`, `MultilineStringDelimiter = "'''"`). Spans physical lines; handled in `PreLexer.HandleMultilineStrings` (`:17-66`).
+- `"..."` - single-line string. `\"` and `\\` are escapes (`Grammar.cs:139`).
+- `'''...'''` - **multi-line** string (`Grammar.cs:149-153`, `MultilineStringDelimiter = "'''"`). Spans physical lines; handled in `PreLexer.HandleMultilineStrings` (`:17-66`).
 
 ---
 
-## 3. `using` — including other `.repl` files
+## 3. `using` - including other `.repl` files
 
 ```repl
 using "platforms/cpus/stm32f4.repl"
@@ -108,7 +108,7 @@ gpioPortD:
     12 -> UserLED@0
 ```
 
-Note the last entry: `gpioPortD:` has **no type** — it *extends* the `gpioPortD` already
+Note the last entry: `gpioPortD:` has **no type** - it *extends* the `gpioPortD` already
 declared in the included CPU file (see the merge model, §9). It adds an IRQ connection
 without re-declaring the peripheral.
 
@@ -137,7 +137,7 @@ Grammar: `Grammar.cs:438-447`. An entry is:
 | `local` | optional | Variable is confined to the current file's scope (not visible to includers). `LocalKeyword`, `Grammar.cs:120`. |
 | `variableName` | **yes** | An identifier; the handle other entries and the Monitor use. |
 | `TypeName` | optional | `Category.Class` (dotted). Present = *create* this object. Absent = *amend* an existing variable (merge/extend). |
-| `registration` | optional | `@ ...` — where to attach it. Absent = create but don't register (used for objects referenced by others, e.g. `CombinedInput` fan-in). |
+| `registration` | optional | `@ ...` - where to attach it. Absent = create but don't register (used for objects referenced by others, e.g. `CombinedInput` fan-in). |
 | `as "alias"` | optional | Register the peripheral under this name instead of `variableName`. Requires a (non-`none`) registration. `Grammar.cs:444`, validated `CreationDriver.cs:506-518`. |
 | attribute block | optional | Indented `name: value` lines and IRQ lines. |
 
@@ -149,7 +149,7 @@ Resolution (`CreationDriver.ResolveTypeOrThrow`, `:1913-1924`): the parser first
 name verbatim, then prepends the **default namespace `Antmicro.Renode.Peripherals.`**
 (`DefaultNamespace`, `:1979`). So `UART.STM32F7_USART` →
 `Antmicro.Renode.Peripherals.UART.STM32F7_USART`. The leading `Category` segment is just
-the namespace tail after `Antmicro.Renode.Peripherals` — see the
+the namespace tail after `Antmicro.Renode.Peripherals` - see the
 [namespace↔category convention](03-csharp-peripherals.md#7-namespace--repl-category-convention).
 
 You may also write a **fully-qualified** type (e.g. a peripheral outside that namespace, or
@@ -157,7 +157,7 @@ a test mock like `new Antmicro.Renode.UnitTests.Mocks.MockCPU`).
 
 ---
 
-## 5. Registration — the `@` clause
+## 5. Registration - the `@` clause
 
 > ⚠️ The `@` in a **registration** clause (`@ sysbus 0x...`) means a *bus address / attach
 > point*. The `@` in an **IRQ** clause (`-> nvic@5`) means a *destination input index*.
@@ -168,7 +168,7 @@ Grammar: `RegistrationInfo`/`RegistrationInfos`, `Grammar.cs:244-263`. Forms:
 | Form | Example | Meaning |
 |---|---|---|
 | address (point) | `@ sysbus 0x40011000` | Map at a single address. Becomes a `BusPointRegistration`; the peripheral must be `IKnownSize` so its length is known. |
-| range | `@ sysbus <0x58022800, +0x400>` | Map over an explicit range `[start, start+len)`. Becomes a `BusRangeRegistration`. (`<a, b>` is start/end; `<a, +n>` is start/length — the `+` form, `Grammar.cs:170-171`.) |
+| range | `@ sysbus <0x58022800, +0x400>` | Map over an explicit range `[start, start+len)`. Becomes a `BusRangeRegistration`. (`<a, b>` is start/end; `<a, +n>` is start/length - the `+` form, `Grammar.cs:170-171`.) |
 | bare | `@ sysbus` | Attach with no address (`NullRegistrationPoint`). Used for CPUs and for things addressed another way. |
 | numbered | `@ gpioPortA` *(point on a non-bus parent)* or `@ i2c 0x20` | Attach to a non-bus parent at a number/slot (`NumberRegistrationPoint<T>`). |
 | reference parent | `@ gpioPortD` | The parent can be any registered peripheral that exposes a suitable register interface, not just `sysbus`. |
@@ -186,7 +186,7 @@ flex_spi: SPI.IMXRT_FlexSPI @ {
 }
 ```
 
-Real `@ none` (`platforms/cpus/stm32h7.repl`) — a combiner that has no bus address but
+Real `@ none` (`platforms/cpus/stm32h7.repl`) - a combiner that has no bus address but
 fans several lines into one NVIC input:
 
 ```repl
@@ -197,15 +197,15 @@ nvicInput23: Miscellaneous.CombinedInput @ none
 
 ---
 
-## 6. Attributes — constructor args and properties
+## 6. Attributes - constructor args and properties
 
 Inside the indented block, the most common attribute is `name: value`
 (`ConstructorOrPropertyAttribute`, `Grammar.cs:265-269`). The **same syntax** is used for:
 
-- **Constructor arguments** — matched to a C# constructor parameter *by name* (e.g.
+- **Constructor arguments** - matched to a C# constructor parameter *by name* (e.g.
   `frequency: 200000000` → ctor param `frequency`). See
   [doc 04 §… ctor selection](04-repl-to-csharp-bridge.md).
-- **Properties** — matched to a public property *with a public setter* (e.g.
+- **Properties** - matched to a public property *with a public setter* (e.g.
   `priorityMask: 0xF0`).
 
 The parser decides which after type resolution: if the name matches a constructor
@@ -255,7 +255,7 @@ flex_spi: SPI.IMXRT_FlexSPI @ {
 
 ---
 
-## 7. Interrupt (IRQ) wiring — the `->` clause
+## 7. Interrupt (IRQ) wiring - the `->` clause
 
 This is the most distinctive part of `.repl`. An IRQ attribute connects a **GPIO output**
 of *this* peripheral to a **GPIO input** of another. Grammar:
@@ -276,7 +276,7 @@ of *this* peripheral to a **GPIO input** of another. Grammar:
 The number after `@` on the **destination** is the **input pin index** on that receiver, not
 an address. The number/identifier before `->` identifies the **source** output.
 
-Real, dense example (`platforms/cpus/stm32h7.repl`) — an EXTI controller routing many
+Real, dense example (`platforms/cpus/stm32h7.repl`) - an EXTI controller routing many
 lines to NVIC inputs, NVIC input combiners, and using ranges, lists, and singletons:
 
 ```repl
@@ -314,7 +314,7 @@ in three labeled sections. Grammar: `Grammar.cs:291-310`. Each can take an `add`
 
 | Section | When it runs | Prefixing | Source |
 |---|---|---|---|
-| `preinit:` | **before** the peripheral is created (e.g. to compile/prepare something) | none — run as global Monitor commands | `CreationDriver.cs:205-219`; `MonitorScriptHandler.Execute` with `scriptable == null` (`MonitorScriptHandler.cs:29-38`) |
+| `preinit:` | **before** the peripheral is created (e.g. to compile/prepare something) | none - run as global Monitor commands | `CreationDriver.cs:205-219`; `MonitorScriptHandler.Execute` with `scriptable == null` (`MonitorScriptHandler.cs:29-38`) |
 | `init:` | **after** the peripheral is created and registered | each line is **prefixed with the peripheral's name** | `CreationDriver.cs:304-310`; `MonitorScriptHandler.cs:40-55` |
 | `reset:` | registered as a per-peripheral `reset` **macro**, replayed on every machine/peripheral reset | each line prefixed with the peripheral's name | `CreationDriver.cs:312-317`; `MonitorScriptHandler.RegisterReset`, `:57-84` |
 
@@ -350,14 +350,14 @@ cpu: ...
   include hierarchy.
 - **Untyped entries amend** the declared variable: they add attributes, IRQ connections, or
   a registration. This is how a board file tweaks a CPU file's peripheral
-  (`nvic:` with just `systickFrequency: ...`, or `gpioPortD:` adding an IRQ — §3).
+  (`nvic:` with just `systickFrequency: ...`, or `gpioPortD:` adding an IRQ - §3).
 - Setting an attribute to **`none`** in a later entry removes it.
 - Already-registered peripherals and the machine itself are pre-seeded as variables
   (`sysbus`, `machine`, any previously created `cpu`, …) so you can reference them without
   declaring them (`PrepareVariables`, `:354-363`; details in
   [doc 04 §3](04-repl-to-csharp-bridge.md#3-why-sysbus-is-a-usable-variable-without-being-declared)).
 
-The smallest possible "platform" leans entirely on this — `platforms/cpus/stm32h743.repl`
+The smallest possible "platform" leans entirely on this - `platforms/cpus/stm32h743.repl`
 is just:
 
 ```repl
@@ -399,7 +399,7 @@ GPIO lines. The `gpioPortD:` entry merges into the port declared by the included
 ## 11. Common errors & gotchas
 
 - **Indent not a multiple of 4** → `WrongIndent` (`PreLexer.cs:364-367`). Tabs don't count as indent.
-- **`//` not preceded by a space** is *not* a comment — but two slashes mid-value (like `http://`) are intentionally fine; a stray `x//y` may surprise you. Prefer a leading space before `//`.
+- **`//` not preceded by a space** is *not* a comment - but two slashes mid-value (like `http://`) are intentionally fine; a stray `x//y` may surprise you. Prefer a leading space before `//`.
 - **Using a property without a public setter** → `PropertyNotWritable` (`CreationDriver.cs:1312-1315`). If a value should be settable from `.repl`, the C# needs `{ get; set; }` (not `{ get; private set; }`).
 - **No matching constructor / ambiguous constructor** → the driver prints a detailed "constructor selection report" (`CreationDriver.cs:1666-1819`). Usually a misnamed attribute or a wrong value type.
 - **IRQ arity mismatch** (`[0-3] -> x@[0-2]`) → `WrongIrqArity` (`:1264-1268`).
@@ -409,5 +409,5 @@ GPIO lines. The `gpioPortD:` entry merges into the port declared by the included
 
 ---
 
-Next: [`02-resc-monitor.md`](02-resc-monitor.md) — the `.resc`/Monitor language that
+Next: [`02-resc-monitor.md`](02-resc-monitor.md) - the `.resc`/Monitor language that
 orchestrates these platforms (and that `init`/`reset`/`preinit` sections speak).

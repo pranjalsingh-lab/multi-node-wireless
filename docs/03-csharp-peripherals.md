@@ -1,4 +1,4 @@
-# 03 — Authoring C# Peripherals
+# 03 - Authoring C# Peripherals
 
 > The behavioral models that a `.repl` instantiates. A peripheral is a C# class in the
 > **`renode-infrastructure`** tree that models a real device's registers, timers, and
@@ -18,7 +18,7 @@ All paths below are within the `renode-infrastructure` tree unless noted.
 
 Declared under `src/Emulator/Main/`.
 
-### `IPeripheral` — the root
+### `IPeripheral` - the root
 `src/Emulator/Main/Peripherals/IPeripheral.cs:22-25`:
 ```csharp
 [Icon("box")]
@@ -29,35 +29,35 @@ public interface IPeripheral : IEmulationElement, IAnalyzable
 ```
 Every peripheral implements `Reset()`. `IEmulationElement` provides the logging extension
 methods (`this.Log(...)`, `this.DebugLog(...)`, §5). The same file's `IPeripheralExtensions`
-(`:27-120`) gives `GetGPIOs`, `HasGPIO`, `GetMachine` — used by the framework to discover a
+(`:27-120`) gives `GetGPIOs`, `HasGPIO`, `GetMachine` - used by the framework to discover a
 peripheral's GPIO outputs by reflection.
 
-### `IBusPeripheral` — "mappable on the system bus"
-`src/Emulator/Main/Peripherals/Bus/IBusPeripheral.cs:10-12` — a pure marker
+### `IBusPeripheral` - "mappable on the system bus"
+`src/Emulator/Main/Peripherals/Bus/IBusPeripheral.cs:10-12` - a pure marker
 (`interface IBusPeripheral : IPeripheral {}`). The access-width interfaces extend it.
 
-### Access-width interfaces — how the bus reads/writes you
+### Access-width interfaces - how the bus reads/writes you
 In `src/Emulator/Main/Peripherals/Bus/`:
-- `IDoubleWordPeripheral.cs:11-16` — `uint ReadDoubleWord(long offset)` / `void WriteDoubleWord(long, uint)`
-- `IWordPeripheral.cs:11-16` — 16-bit
-- `IBytePeripheral.cs:11-16` — 8-bit
-- `IQuadWordPeripheral` — 64-bit
+- `IDoubleWordPeripheral.cs:11-16` - `uint ReadDoubleWord(long offset)` / `void WriteDoubleWord(long, uint)`
+- `IWordPeripheral.cs:11-16` - 16-bit
+- `IBytePeripheral.cs:11-16` - 8-bit
+- `IQuadWordPeripheral` - 64-bit
 
 Implement the width(s) the hardware actually uses. If the guest accesses a width you didn't
 implement, the class attribute `[AllowedTranslations(...)]` lets the bus synthesize it from a
 width you did (e.g. `RiscVMachineTimer.cs:16` translates dword↔quadword).
 
-### `IKnownSize` — declares the MMIO window length
+### `IKnownSize` - declares the MMIO window length
 `src/Emulator/Main/Peripherals/IKnownSize.cs:13-16`:
 ```csharp
 public interface IKnownSize : IBusPeripheral { long Size { get; } }
 ```
 Implement this (usually a one-liner, `public long Size => 0x100;`) so the `.repl` can map you
 with just `@ sysbus 0xADDR` (a `BusPointRegistration`, which needs your size to compute the
-range — see [doc 04](04-repl-to-csharp-bridge.md#2-the-registration-model)). Without it you
+range - see [doc 04](04-repl-to-csharp-bridge.md#2-the-registration-model)). Without it you
 must use a range registration `@ sysbus <addr, +size>`.
 
-### `IProvidesRegisterCollection<T>` — exposes the register table
+### `IProvidesRegisterCollection<T>` - exposes the register table
 `src/Emulator/Main/Core/Structure/Registers/RegisterCollection.cs:548-551`:
 ```csharp
 public interface IProvidesRegisterCollection<T> where T : IRegisterCollection
@@ -67,17 +67,17 @@ Implementing this (with a `DoubleWordRegisterCollection`, etc.) unlocks the flue
 `Registers.X.Define(this)…` helpers and register-dump/hook tooling.
 
 ### GPIO interfaces (under `src/Emulator/Main/Core/`)
-- `IGPIOReceiver.cs:14-17` — `void OnGPIO(int number, bool value)`: how you **receive** a line.
-- `INumberedGPIOOutput.cs:14-17` — `IReadOnlyDictionary<int, IGPIO> Connections { get; }`: how
+- `IGPIOReceiver.cs:14-17` - `void OnGPIO(int number, bool value)`: how you **receive** a line.
+- `INumberedGPIOOutput.cs:14-17` - `IReadOnlyDictionary<int, IGPIO> Connections { get; }`: how
   you **expose a numbered bank** of outputs (IRQ controllers, GPIO ports).
-- `ILocalGPIOReceiver.cs:10-13` — `IGPIOReceiver GetLocalReceiver(int index)`: front many
+- `ILocalGPIOReceiver.cs:10-13` - `IGPIOReceiver GetLocalReceiver(int index)`: front many
   sub-receivers behind one object (the `.repl` `dest#localIndex` syntax).
 
-### `IPeripheralContainer<TPeripheral, TRegistrationPoint>` — hosts child peripherals
-`src/Emulator/Main/Core/Structure/IPeripheralContainer.cs:17-24` — implemented by parents that
+### `IPeripheralContainer<TPeripheral, TRegistrationPoint>` - hosts child peripherals
+`src/Emulator/Main/Core/Structure/IPeripheralContainer.cs:17-24` - implemented by parents that
 can have children registered under them (a bus, an I2C/SPI controller, a GPIO port). It
 extends `IRegisterablePeripheral<,>` (the `Register`/`Unregister` contract used by the
-`.repl` engine — [doc 04 §2](04-repl-to-csharp-bridge.md#2-the-registration-model)).
+`.repl` engine - [doc 04 §2](04-repl-to-csharp-bridge.md#2-the-registration-model)).
 
 ---
 
@@ -118,7 +118,7 @@ capture a handle), `WithFlags`/`WithValueFields` (banks), `WithReservedBits`, `W
 `FieldMode` (`Registers/FieldMode.cs:15-29`) includes `Read`, `Write`, `Set`,
 `WriteOneToClear`, `WriteZeroToClear`, `ReadToClear`, … (default `Read | Write`).
 
-### `BasicDoubleWordPeripheral` — the usual starting point
+### `BasicDoubleWordPeripheral` - the usual starting point
 `src/Emulator/Main/Peripherals/BasicDoubleWordPeripheral.cs:17-49`:
 ```csharp
 public abstract class BasicDoubleWordPeripheral : IDoubleWordPeripheral,
@@ -147,7 +147,7 @@ register names). `BasicWordPeripheral` / `BasicBytePeripheral` are the analogues
 ## 3. GPIO / IRQ model
 
 ### The `GPIO` class
-`src/Emulator/Main/Core/GPIO.cs:18` — `[Convertible] public sealed class GPIO : IGPIOWithHooks`.
+`src/Emulator/Main/Core/GPIO.cs:18` - `[Convertible] public sealed class GPIO : IGPIOWithHooks`.
 `IGPIO` (`Core/IGPIO.cs:12-30`) has `IsSet`, `Set(bool)`, `Toggle()`, `Connect/Disconnect`.
 Crucially, `Set` only propagates on an **edge** and pushes to every connected receiver
 (`GPIO.cs:42-58`):
@@ -166,7 +166,7 @@ public void Set(bool value)
 ```
 
 ### Exposing a single interrupt output
-The idiomatic pattern — a read-only auto-property initialized once:
+The idiomatic pattern - a read-only auto-property initialized once:
 ```csharp
 public GPIO IRQ { get; } = new GPIO();      // RiscVMachineTimer.cs:64
 ```
@@ -182,12 +182,12 @@ private void UpdateInterrupts()             // RiscVMachineTimer.cs:74-79
 A peripheral may expose several `GPIO` properties (e.g. an IRQ line and a DMA-request line).
 The framework finds them by reflecting over public `GPIO`-typed properties.
 
-### `[DefaultInterrupt]` — disambiguating multiple outputs
+### `[DefaultInterrupt]` - disambiguating multiple outputs
 `src/Emulator/Main/Peripherals/DefaultInterruptAttribute.cs:19-22`. When a peripheral has
 several `GPIO` outputs, mark one with `[DefaultInterrupt]` so a `.repl` can connect to it with
 the bare `-> dest@n` form (no source name). Used e.g. `RenesasDA14_GPT.cs:84-85`.
 
-### Numbered output banks — `INumberedGPIOOutput.Connections`
+### Numbered output banks - `INumberedGPIOOutput.Connections`
 For a bank of outputs, populate `Connections` in the constructor:
 ```csharp
 var innerConnections = new Dictionary<int, IGPIO>();   // STM32H7_EXTI.cs:21-26
@@ -197,12 +197,12 @@ Connections = new ReadOnlyDictionary<int, IGPIO>(innerConnections);
 ```
 In `.repl` these are addressed by index: `[0-15] -> exti@[0-15]`.
 
-### Receiving an IRQ — `OnGPIO`
+### Receiving an IRQ - `OnGPIO`
 Implement `IGPIOReceiver.OnGPIO(int number, bool value)`. Canonical body
 (`GPIOPort/BaseGPIOPort.cs:26-34`): validate the pin, store state.
 
-### `[GPIO]` class attribute — declare input/output counts
-`src/Emulator/Main/Core/GPIOAttribute.cs:13-33` — `[GPIO(NumberOfInputs = 1)]` (default 0 =
+### `[GPIO]` class attribute - declare input/output counts
+`src/Emulator/Main/Core/GPIOAttribute.cs:13-33` - `[GPIO(NumberOfInputs = 1)]` (default 0 =
 unbounded). Used by `GPIO.Validate` to reject out-of-range connections.
 
 ---
@@ -211,7 +211,7 @@ unbounded). Used by `GPIO.Validate` to reject out-of-range connections.
 
 ### `IMachine machine` is auto-injected
 By convention the **first ctor parameter is `IMachine machine`** (`RiscVMachineTimer.cs:19`,
-`BasicDoubleWordPeripheral.cs:19`, `BaseGPIOPort.cs:91`). The `.repl` never supplies it — the
+`BasicDoubleWordPeripheral.cs:19`, `BaseGPIOPort.cs:91`). The `.repl` never supplies it - the
 platform engine fills any `IMachine`-typed parameter with the current machine and **forbids**
 the user from setting it (`CreationDriver.cs:1825-1834`, `:1732-1736`; see
 [doc 04 §6](04-repl-to-csharp-bridge.md#6-imachinemachine-auto-injection)).
@@ -230,13 +230,13 @@ clint: Timers.RiscVMachineTimer @ sysbus 0x...
 ```
 
 ### What makes a *property* settable from `.repl`
-A **public setter** — nothing else. The engine rejects assigning a property whose
+A **public setter** - nothing else. The engine rejects assigning a property whose
 `GetSetMethod()` is null (`CreationDriver.cs:1312-1315`) and otherwise invokes the setter
 (`:889`). So `public T Foo { get; set; }` is `.repl`-settable; `{ get; }` or
 `{ get; private set; }` is not.
 
 ### `[NameAlias]`
-`src/Emulator/Main/Peripherals/NameAliasAttribute.cs:15-27` — an alternative name a ctor
+`src/Emulator/Main/Peripherals/NameAliasAttribute.cs:15-27` - an alternative name a ctor
 parameter or enum type can be referred to by in `.repl` (checked in
 `CreationDriver.NameOrAliasMatches`, `:1846-1854`).
 
@@ -259,7 +259,7 @@ Extension methods on `IEmulationElement` (`src/Emulator/Main/Logging/Logger.cs`)
 automatically (with register names when the peripheral is `IHasMappedRegisters`).
 
 ### Read/Write wiring
-With a collection, the body is mechanical — forward the offset:
+With a collection, the body is mechanical - forward the offset:
 ```csharp
 public uint ReadDoubleWord(long offset)         => RegistersCollection.Read(offset);
 public void WriteDoubleWord(long offset, uint v) => RegistersCollection.Write(offset, v);
@@ -272,7 +272,7 @@ in a `DefineRegisters()` method (example B).
 
 ## 6. Two complete, annotated real peripherals
 
-### Example A — a timer with an IRQ output: `RiscVMachineTimer`
+### Example A - a timer with an IRQ output: `RiscVMachineTimer`
 `src/Emulator/Peripherals/Peripherals/Timers/RiscVMachineTimer.cs` (~102 lines):
 ```csharp
 namespace Antmicro.Renode.Peripherals.Timers          // category = "Timers"
@@ -327,7 +327,7 @@ Takeaways: (1) `IMachine` + a real param (`frequency`) both map to `.repl`; (2) 
 keyed by an `enum : long`; (3) `valueProviderCallback`/`writeCallback` model live behavior;
 (4) the IRQ is a single `GPIO` property driven from one `UpdateInterrupts()`.
 
-### Example B — a GPIO port: `Murax_GPIO` (uses `BaseGPIOPort` + register collection)
+### Example B - a GPIO port: `Murax_GPIO` (uses `BaseGPIOPort` + register collection)
 `src/Emulator/Peripherals/Peripherals/GPIOPort/Murax_GPIO.cs` (~77 lines):
 ```csharp
 namespace Antmicro.Renode.Peripherals.GPIOPort         // category = "GPIOPort"
@@ -374,7 +374,7 @@ Takeaways: (1) `Registers.Output.Define(this)` works because the class provides 
 (3) the GPIO bank (`Connections`, `State[]`, `OnGPIO`, `Reset`) comes free from `BaseGPIOPort`.
 
 For a `BasicDoubleWordPeripheral` subclass that *only* adds registers, see
-`src/Emulator/Peripherals/Peripherals/Miscellaneous/MAX32650_PWRSEQ.cs` — `: base(machine)`,
+`src/Emulator/Peripherals/Peripherals/Miscellaneous/MAX32650_PWRSEQ.cs` - `: base(machine)`,
 `IKnownSize`, one register defined with `WithTag`/`WithReservedBits`/`WithTaggedFlag`/`WithFlag`.
 
 ---
@@ -396,7 +396,7 @@ directory by convention). Verified pairings:
 So a class `RiscVMachineTimer` in `namespace Antmicro.Renode.Peripherals.Timers` is referenced
 as `Timers.RiscVMachineTimer`. The resolver keys off the **namespace** (via the default-prefix
 logic in [doc 04 §1](04-repl-to-csharp-bridge.md#1-typemanager--type-resolution--assembly-scanning)),
-not the directory — but keep them aligned.
+not the directory - but keep them aligned.
 
 A complete `.repl` entry annotated against the C#:
 ```repl
@@ -410,7 +410,7 @@ usart1: UART.STM32F7_USART @ sysbus 0x40013800   # var : Category.Class @ bus 0x
 ## 8. Making a new peripheral available
 
 A new `.cs` file in the right category folder is compiled into `Infrastructure.dll`
-automatically (the project globs `**/*.cs`), and `TypeManager` then indexes it — so **"drop a
+automatically (the project globs `**/*.cs`), and `TypeManager` then indexes it - so **"drop a
 `.cs` in the right folder, rebuild, reference it from `.repl`"** just works. The Monitor can
 also ad-hoc compile a loose `.cs` at runtime via `include @file.cs`. Mechanics in
 [doc 04 §5](04-repl-to-csharp-bridge.md#5-how-peripheral-cs-files-reach-the-assembly-typemanager-scans).
@@ -419,10 +419,10 @@ also ad-hoc compile a loose `.cs` at runtime via `include @file.cs`. Mechanics i
 
 ## 9. Authoring checklist
 
-1. `namespace Antmicro.Renode.Peripherals.<Category>;` — drives the `.repl` prefix (§7).
+1. `namespace Antmicro.Renode.Peripherals.<Category>;` - drives the `.repl` prefix (§7).
 2. Pick a base: subclass `BasicDoubleWordPeripheral` for plain register devices, or implement
    `IDoubleWord/Word/Byte/QuadWordPeripheral` directly; add `IKnownSize` (§1).
-3. Constructor `public Foo(IMachine machine, …)` — `machine` is auto-injected; other params
+3. Constructor `public Foo(IMachine machine, …)` - `machine` is auto-injected; other params
    and `{ get; set; }` properties come from `.repl` (§4).
 4. Build registers: an `enum : long` of offsets + a `…RegisterCollection`, using
    `WithValueField`/`WithFlag`/`WithEnumField`/`WithReservedBits`/`WithTaggedFlag` and the
@@ -443,5 +443,5 @@ also ad-hoc compile a loose `.cs` at runtime via `include @file.cs`. Mechanics i
 
 ---
 
-Next: [`04-repl-to-csharp-bridge.md`](04-repl-to-csharp-bridge.md) — how a `.repl` type name
+Next: [`04-repl-to-csharp-bridge.md`](04-repl-to-csharp-bridge.md) - how a `.repl` type name
 becomes one of these live, registered C# objects.

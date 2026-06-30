@@ -2,7 +2,7 @@
 #
 # Renode needs a full Linux userland (Mono/.NET runtime + system libs), which is
 # why this can't run serverless. The official Renode image already solves all of
-# that — but its base OS is old, so running apt inside it fails. So we do all the
+# that - but its base OS is old, so running apt inside it fails. So we do all the
 # fetching/installing in a clean Debian build stage and copy the results in.
 
 # ---- build stage: Node runtime, app deps, and firmware (apt works here) ------
@@ -21,7 +21,10 @@ RUN cd app && npm install --omit=dev --no-audit --no-fund
 # App source.
 COPY app ./app
 
-# Default firmware images — the same files setup.sh fetches.
+# Reference firmware sources shown read-only in the UI (the "View code" panel).
+COPY firmware/src ./firmware/src
+
+# Default firmware images - the same files setup.sh fetches.
 RUN mkdir -p firmware/defaults firmware/uploads \
  && DL="https://dl.antmicro.com/projects/renode" \
  && curl -L --retry 3 "$DL/nrf52840--zephyr-bluetooth_central_hr.elf-s_3380332-316e27f81dcda3c2b0e7f2c3516001e7b27ad051"   -o firmware/defaults/gateway.elf \
@@ -35,14 +38,14 @@ FROM antmicro/renode:latest
 ENTRYPOINT []
 
 # The base image runs as a non-root user, but the app writes to /srv at runtime
-# (work/, run.resc, renode.log, uploaded firmware). Run as root so those — and
-# the COPY'd files below — are writable.
+# (work/, run.resc, renode.log, uploaded firmware). Run as root so those - and
+# the COPY'd files below - are writable.
 USER root
 
-# Bring in just the Node.js runtime from the build stage — npm isn't needed at
+# Bring in just the Node.js runtime from the build stage - npm isn't needed at
 # runtime (deps were already installed there). node is a single binary on PATH.
 # (node from bullseye/glibc 2.31 runs on the Renode base; if you ever hit a
-# "GLIBC_… not found" error, the base is older than expected — tell me and I'll
+# "GLIBC_… not found" error, the base is older than expected - tell me and I'll
 # switch to fetching the standalone Node tarball instead.)
 COPY --from=build /usr/local/bin/node /usr/local/bin/node
 

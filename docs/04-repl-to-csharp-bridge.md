@@ -1,12 +1,12 @@
-# 04 — The `.repl` → C# Bridge (Runtime Plumbing)
+# 04 - The `.repl` → C# Bridge (Runtime Plumbing)
 
 > How a line like `uart0: UART.STM32F7_USART @ sysbus 0x40011000` becomes a live, registered
 > C# object. This is the machinery between [doc 01 (`.repl`)](01-repl-format.md) and
 > [doc 03 (C# peripherals)](03-csharp-peripherals.md).
 
 **Two trees:**
-- `renode` — the platform-description **driver** (`src/Renode/PlatformDescription/`).
-- `renode-infrastructure` — core types (`Machine`, `SystemBus`, registration points,
+- `renode` - the platform-description **driver** (`src/Renode/PlatformDescription/`).
+- `renode-infrastructure` - core types (`Machine`, `SystemBus`, registration points,
   `TypeManager`) under `src/Emulator/Main/`, plus all peripherals. Mounted into the main
   build at `src/Infrastructure/` (`Renode.sln:16`).
 
@@ -41,7 +41,7 @@ onto it; the sections below detail each piece.
 
 ---
 
-## 1. TypeManager — type resolution & assembly scanning
+## 1. TypeManager - type resolution & assembly scanning
 
 **File:** `renode-infrastructure/src/Emulator/Main/Utilities/TypeManager.cs`
 (`Antmicro.Renode.Utilities.TypeManager`).
@@ -67,7 +67,7 @@ system/GUI libs (`:270-326`), and `AnalyzeAssembly`s the rest (`:690-709`).
 ### Indexing (Mono.Cecil, metadata only)
 `AnalyzeAssembly` (`:441-581`) reads each assembly's metadata **without loading it into the
 CLR** (Cecil). For each type it records: peripherals (`: IPeripheral`), `[Plugin]`s,
-`IAutoLoadType`s (eagerly loaded — this is how Monitor commands self-register), and
+`IAutoLoadType`s (eagerly loaded - this is how Monitor commands self-register), and
 "interesting" types (namespace under `Antmicro.Renode`) indexed by full name into
 `assemblyFromTypeName`. It also records, for each abstract base, its concrete subclasses
 (backing `GetConcreteSubclasses`).
@@ -80,7 +80,7 @@ a Cecil-indexed name into a real `System.Type` only when a `.repl` first needs i
 names (multiple assemblies) require a resolver callback.
 
 ### `GetConcreteSubclasses(Type)` (`:181-188`)
-Used when a `.repl` names an **abstract** type — the driver lists concrete subclasses in the
+Used when a `.repl` names an **abstract** type - the driver lists concrete subclasses in the
 error so you can pick one (`FindConstructor`, `CreationDriver.cs:1668-1673`).
 
 ---
@@ -124,10 +124,10 @@ public interface IBusController :
 The candidate registration-point types for a given peripheral are the **second generic
 arguments** of those interfaces whose **first** argument is assignable from the peripheral's
 type. `SystemBus.Register(IKnownSize, BusPointRegistration)` forwards to the range overload via
-`registrationPoint.ToRangeRegistration(peripheral.Size)` — which is **why a point registration
+`registrationPoint.ToRangeRegistration(peripheral.Size)` - which is **why a point registration
 requires `IKnownSize`** (`SystemBus.cs:1214-1217`).
 
-### How the driver picks the ctor — `FindUsableRegistrationPoints`
+### How the driver picks the ctor - `FindUsableRegistrationPoints`
 `CreationDriver.cs:829-874`. For each candidate registration-point type, enumerate its ctors:
 - **value present** (e.g. `0x40000000` or `<a,+s>`): keep ctors where the **first** parameter
   is the value and any later parameters are optional (`parameters.Length == 1 ||
@@ -151,7 +151,7 @@ most-derived point + registree, and pins
 `registrationInfo.RegistrationInterface = IRegisterablePeripheral<registree, pointType>`
 (`:688`).
 
-### Performing the registration — `TryRegisterFromEntry` (`:1035-1166`)
+### Performing the registration - `TryRegisterFromEntry` (`:1035-1166`)
 Builds the registration-point object (slot 0 = converted value; remaining slots filled by
 `FillDefaultParameter`, which can inject `IMachine`), then the actual call:
 ```csharp
@@ -175,7 +175,7 @@ SetLocalName(SystemBus, SystemBusName);   // :61   ("sysbus", :1430)
 The driver seeds its variable table from the live machine in `PrepareVariables`
 (`CreationDriver.cs:354-363`): it adds `machine` (`Machine.MachineKeyword == "machine"`) and
 **every already-named peripheral** (`machine.GetRegisteredPeripherals()`). Because `sysbus` was
-already named in the `Machine` ctor, it shows up here — that's why `@ sysbus` resolves though
+already named in the `Machine` ctor, it shows up here - that's why `@ sysbus` resolves though
 `sysbus` is never declared. The same mechanism makes a previously-created `cpu` (or any earlier
 peripheral) referenceable in a later `.repl`. There is **no special-casing of `cpu`**; it's
 just whatever peripheral was named `cpu`.
@@ -198,7 +198,7 @@ own constructor (the registration-point logic above is for its *attach point*):
   leftovers (`unusedAttributes.Count == 0`, `:1785-1789`).
 - Exactly one acceptable ctor → use it; zero → `NoCtor` error; more than one → `AmbiguousCtor`.
   On failure the driver prints a detailed **"constructor selection report"** showing why each
-  ctor was rejected (`:1806-1819`) — read it; it usually pinpoints a misnamed attribute or
+  ctor was rejected (`:1806-1819`) - read it; it usually pinpoints a misnamed attribute or
   wrong value type.
 
 Object creation: `CreateAndHandleError` invokes the chosen ctor with
@@ -209,19 +209,19 @@ setter (`SetPropertiesAndConnectInterrupts`, `:876-900`).
 
 ## 5. How peripheral `.cs` files reach the assembly TypeManager scans
 
-**File:** `renode-infrastructure/src/Infrastructure.csproj` — an SDK-style project
+**File:** `renode-infrastructure/src/Infrastructure.csproj` - an SDK-style project
 (`<Project Sdk="Microsoft.NET.Sdk">`). The .NET SDK **implicitly compiles every `**/*.cs`**
 under the project directory; there are **no explicit `<Compile Include>` items**, only a few
 **removals** (`:60-65`, e.g. `Plugins/**`, test dirs). Because the project root is
 `renode-infrastructure/src/`, every peripheral under `Emulator/Peripherals/**` is globbed into
 `Infrastructure.dll` automatically.
 
-**This is exactly why "drop a `.cs` in the right folder and rebuild" works** — no manifest edit;
+**This is exactly why "drop a `.cs` in the right folder and rebuild" works** - no manifest edit;
 the file is compiled into `Infrastructure.dll`, which `TypeManager` then scans from the build
 output (§1). The project is pulled into the main build via `Renode.sln:16`.
 
 **Runtime addition (no rebuild):** the Monitor can ad-hoc compile a loose `.cs`
-(`include @file.cs`) — `AdHocCompiler.Compile` → `Assembly.LoadFrom` →
+(`include @file.cs`) - `AdHocCompiler.Compile` → `Assembly.LoadFrom` →
 `TypeManager.Instance.ScanFile(...)` (`renode-infrastructure/.../UserInterface/Monitor.cs:436-446`),
 indexing that single assembly into the same dictionaries so a fresh peripheral is resolvable by
 `.repl` immediately.
@@ -232,7 +232,7 @@ indexing that single assembly into the same dictionaries so a fresh peripheral i
 
 `Machine : IMachine` (`renode-infrastructure/src/Emulator/Main/Core/Machine.cs:40`;
 `IMachine` at `…/Peripherals/IMachine.cs`). The driver fills any `IMachine`-typed parameter
-with the current machine — `TryGetValueOfOurDefaultParameter` (`CreationDriver.cs:1825-1834`):
+with the current machine - `TryGetValueOfOurDefaultParameter` (`CreationDriver.cs:1825-1834`):
 ```csharp
 if(typeof(IMachine).IsAssignableFrom(type)) { value = machine; return true; }
 ```
@@ -275,7 +275,7 @@ gets the owning machine automatically; the `.repl` supplies only the *other* arg
 
 If anything fails, `HandleError` disposes any objects created so far and throws a
 `ParsingException` with file/line and a caret pointing at the offending token
-(`:1882-1911`) — so a bad `.repl` doesn't leave a half-built machine.
+(`:1882-1911`) - so a bad `.repl` doesn't leave a half-built machine.
 
 ---
 
@@ -304,7 +304,7 @@ Monitor as `sysbus.uart0` (or `uart0` with the default `sysbus.` prefix).
 
 ## 9. File index
 
-- Driver: `src/Renode/PlatformDescription/CreationDriver.cs` — type resolve `:1913-1924`
+- Driver: `src/Renode/PlatformDescription/CreationDriver.cs` - type resolve `:1913-1924`
   (`DefaultNamespace` `:1979`); reg-point selection `:599-689`, `:829-874`; ctor selection
   `:1666-1823`; create `:708-764`; props/IRQ `:876-982`; register `:1035-1166`;
   `PrepareVariables` `:354-363`; `IMachine` inject `:1825-1834`; lifecycle `:191-333`.
@@ -320,4 +320,4 @@ Monitor as `sysbus.uart0` (or `uart0` with the default `sysbus.` prefix).
 
 ---
 
-Next: [`05-cheatsheet.md`](05-cheatsheet.md) — copy-pasteable recipes.
+Next: [`05-cheatsheet.md`](05-cheatsheet.md) - copy-pasteable recipes.

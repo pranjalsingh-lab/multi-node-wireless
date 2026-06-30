@@ -39,6 +39,7 @@ const RENODE_BIN = resolveRenode();
 const RENODE_DIR = path.dirname(RENODE_BIN);
 const DEFAULT_FW_DIR = path.join(ROOT, 'firmware', 'defaults');
 const UPLOAD_FW_DIR = path.join(ROOT, 'firmware', 'uploads');
+const SRC_DIR = path.join(ROOT, 'firmware', 'src');
 const WORK_DIR = path.join(ROOT, 'work');
 const RESC_PATH = path.join(WORK_DIR, 'run.resc');
 const RENODE_LOG = path.join(WORK_DIR, 'renode.log');
@@ -59,6 +60,10 @@ const NODES = [
     ble: true,
     sensor: false,
     defaultFw: 'gateway.elf',
+    src: 'gateway.c',
+    sample: 'samples/bluetooth/central_hr',
+    srcOrigin: 'Zephyr sample: samples/bluetooth/central_hr',
+    comms: 'BLE central. Enables Bluetooth and actively scans the radio. When it hears a device advertising the Heart-Rate Service (HRS, UUID 0x180D) it connects, discovers the HR Measurement characteristic (0x2A37), subscribes for notifications, and prints every "[NOTIFICATION]" it receives - that subscription is the live feed you see flowing in.',
   },
   {
     id: 'heartrate',
@@ -69,6 +74,10 @@ const NODES = [
     ble: true,
     sensor: false,
     defaultFw: 'heartrate.elf',
+    src: 'heartrate.c',
+    sample: 'samples/bluetooth/peripheral_hr',
+    srcOrigin: 'Zephyr sample: samples/bluetooth/peripheral_hr',
+    comms: 'BLE peripheral. Advertises the Heart-Rate, Battery and Device-Information services and waits for a central to connect. Once the central enables notifications, it pushes a simulated heart-rate value (cycling 90-160 bpm) once per second over the HRS characteristic.',
   },
   {
     id: 'motion',
@@ -79,6 +88,11 @@ const NODES = [
     ble: false,
     sensor: true,
     defaultFw: 'motion.elf',
+    src: 'motion.c',
+    sample: 'samples/sensor/adxl372',
+    srcOrigin: 'Zephyr sample: samples/sensor/adxl372',
+    buildNote: 'The nRF52840 DK has no accelerometer by default, so add a devicetree overlay (e.g. boards/nrf52840dk_nrf52840.overlay) that declares an adi,adxl372 node on an SPI bus - this lab wires it to spi2 with chip-select on gpio0 pin 22.',
+    comms: 'Sensor node - no radio. It talks to an ADXL372 accelerometer over the SPI bus (chip-select on gpio0 pin 22): it fetches a sample, reads the X/Y/Z channels and prints them. The X/Y/Z sliders in this UI write straight into the emulated sensor\'s registers, so the values the firmware reads change live.',
   },
 ];
 
@@ -238,7 +252,10 @@ function killStray() {
 function preflight() {
   const problems = [];
   if (!fs.existsSync(RENODE_BIN)) {
-    problems.push(`Simulation engine not found at "${RENODE_BIN}". Set RENODE_PATH to your renode launcher.`);
+    // Keep the path/env-var detail in the server console only; the browser
+    // message stays generic so the engine is never named in the UI.
+    console.error(`[engine] not found at "${RENODE_BIN}". Set RENODE_PATH to your launcher, or run ./setup.sh.`);
+    problems.push('Simulation engine not found. Run ./setup.sh, or check the server console for setup details.');
   }
   for (const n of NODES) {
     const fw = firmwareFor(n);
@@ -282,12 +299,13 @@ async function startEmulation() {
   state.running = true;
   sse('status', { running: true, phase: 'starting' });
 
-  // spawn() can fail asynchronously (e.g. ENOENT) — without this the process crashes.
+  // spawn() can fail asynchronously (e.g. ENOENT) - without this the process crashes.
   child.on('error', (e) => {
     if (state.child !== child) return;
     state.child = null;
     state.running = false;
-    sse('status', { running: false, phase: 'error', error: `Could not launch the engine at ${RENODE_BIN}: ${e.code || e.message}` });
+    console.error(`[engine] launch failed at ${RENODE_BIN}: ${e.code || e.message}`);
+    sse('status', { running: false, phase: 'error', error: `Could not launch the simulation engine: ${e.code || e.message}` });
   });
 
   child.on('exit', (code) => {
@@ -299,12 +317,14 @@ async function startEmulation() {
       }
       state.uartSockets = {};
       if (state.monitorSocket) { try { state.monitorSocket.destroy(); } catch (_) {} state.monitorSocket = null; }
-      // If it died almost immediately, the run never really started — surface why.
+      // If it died almost immediately, the run never really started - surface why.
       if (Date.now() - startedAt < 9000) {
         let tail = '';
         try { tail = fs.readFileSync(RENODE_LOG, 'utf8').replace(ANSI, '').trim().split('\n').slice(-12).join('\n'); } catch (_) {}
+        // Never surface the engine's product name in the browser.
+        tail = tail.replace(/renode/ig, 'engine');
         sse('status', { running: false, phase: 'error',
-          error: `The engine exited immediately (code ${code}). Last output:\n${tail || '(no output captured)'}` });
+          error: `The simulation engine exited immediately (code ${code}). Last output:\n${tail || '(no output captured)'}` });
       } else {
         sse('status', { running: false, phase: 'stopped' });
       }
@@ -345,7 +365,7 @@ function stopEmulation() {
 // ----------------------------------------------------------------------------
 const app = express();
 
-// CORS — when the frontend is hosted separately (e.g. on Vercel) it calls this
+// CORS - when the frontend is hosted separately (e.g. on Vercel) it calls this
 // API from a different origin. Allow it, including the SSE stream and uploads.
 // Lock this down by setting CORS_ORIGIN to your frontend URL in production.
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
@@ -406,6 +426,20 @@ app.post('/api/sensor', (req, res) => {
   res.json({ ok });
 });
 
+// Read-only view of the reference firmware source so users can see exactly how
+// each node communicates. There is no in-browser editing or compilation: to run
+// their own, users compile an .elf locally and use the Upload button.
+app.get('/api/source/:node', (req, res) => {
+  const node = NODES.find((n) => n.id === req.params.node);
+  if (!node || !node.src) return res.status(404).json({ ok: false });
+  const file = path.join(SRC_DIR, node.src);
+  let code;
+  try { code = fs.readFileSync(file, 'utf8'); }
+  catch (_) { return res.status(404).json({ ok: false, error: 'Source not found on disk.' }); }
+  res.json({ ok: true, name: node.src, lang: 'c', origin: node.srcOrigin || '',
+    comms: node.comms || '', sample: node.sample || '', buildNote: node.buildNote || '', code });
+});
+
 app.post('/api/upload/:node', upload.single('firmware'), (req, res) => {
   const node = NODES.find((n) => n.id === req.params.node);
   if (!node || !req.file) return res.status(400).json({ ok: false });
@@ -430,6 +464,6 @@ process.on('SIGTERM', async () => { await stopEmulation(); process.exit(0); });
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
-  console.log(`Wireless Device Lab running:  http://localhost:${PORT}`);
-  console.log(`Simulation engine:           ${RENODE_BIN}${fs.existsSync(RENODE_BIN) ? '' : '   <-- NOT FOUND (set RENODE_PATH)'}`);
+  console.log(`Multi-Node Simulation running:  http://localhost:${PORT}`);
+  console.log(`Simulation engine:              ${RENODE_BIN}${fs.existsSync(RENODE_BIN) ? '' : '   <-- NOT FOUND (set RENODE_PATH)'}`);
 });

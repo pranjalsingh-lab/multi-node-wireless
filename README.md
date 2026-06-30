@@ -1,16 +1,16 @@
 # Wireless Device Lab
 
 A minimal web app that boots a **three-node virtual Bluetooth LE network** and lets
-you drop in your own firmware per device — no hardware, no simulator UI to learn.
+you drop in your own firmware per device - no hardware, no simulator UI to learn.
 
-- **Gateway** — BLE *central*. Scans, connects, and collects live readings.
-- **Heart-Rate Band** — BLE *peripheral*. Advertises a heart-rate service and streams beats.
-- **Motion Sensor Node** — an **ADXL372 accelerometer over SPI**. Move it live from the UI
+- **Gateway** - BLE *central*. Scans, connects, and collects live readings.
+- **Heart-Rate Band** - BLE *peripheral*. Advertises a heart-rate service and streams beats.
+- **Motion Sensor Node** - an **ADXL372 accelerometer over SPI**. Move it live from the UI
   and watch the firmware react.
 
 The two BLE nodes connect over a shared radio medium; the motion node reads a real
 modelled sensor. The simulation engine runs entirely in the backend and is never
-surfaced in the UI — users only ever see devices, consoles, and controls.
+surfaced in the UI - users only ever see devices, consoles, and controls.
 
 ## Quick start
 

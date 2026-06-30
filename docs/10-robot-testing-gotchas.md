@@ -1,4 +1,4 @@
-# 10 — Robot Framework Testing with Renode: Lessons from M3
+# 10 - Robot Framework Testing with Renode: Lessons from M3
 
 > Every hard-won debugging lesson from wiring up the SimEV generator's Robot Framework
 > output to a real Renode portable build. Topics: portable vs nightly builds, CAN keyword
@@ -26,7 +26,7 @@ Understanding this stack is the prerequisite for every section below.
 
 ---
 
-## 1. Portable build dates matter — `CANKeywords` was not always there
+## 1. Portable build dates matter - `CANKeywords` was not always there
 
 ### What happened
 
@@ -41,7 +41,7 @@ No keyword with name 'Create CAN Tester' found.
 `CANKeywords.cs` (the file that provides `Create CAN Tester`, `Wait For Frame With Id`,
 `Send UDS Command And Wait For Positive Response`, etc.) was merged into upstream Renode on
 **June 10, 2026** (commit `bf3d55e9`). The stable portable 1.16.1 release is from
-**February 2026** — it predates the merge.
+**February 2026** - it predates the merge.
 
 ### Fix
 
@@ -57,7 +57,7 @@ curl -L https://builds.renode.io/renode-latest.linux-portable.tar.gz \
 ~/renode_nightly/renode-test tests/integration.robot
 ```
 
-Or re-download `renode-latest.linux-portable.tar.gz` — the `-latest` URL always points
+Or re-download `renode-latest.linux-portable.tar.gz` - the `-latest` URL always points
 to the most recent build, so extracting it fresh over `renode_portable/` also works.
 
 ### How to verify a build has CANKeywords
@@ -135,7 +135,7 @@ Bring Up Network
 
 ---
 
-## 3. `@`-path resolution in `.resc` files — the `$bin` variable pattern
+## 3. `@`-path resolution in `.resc` files - the `$bin` variable pattern
 
 ### What happened
 
@@ -149,7 +149,7 @@ Parameters did not match the signature of LoadELF
 ### Why (two sub-causes)
 
 **Sub-cause A: `ReadFilePath.Validate()` throws at parse time.**
-Renode validates `@path` arguments when it parses the Monitor command — before the
+Renode validates `@path` arguments when it parses the Monitor command - before the
 command even runs. If the file does not exist on disk at that moment, it throws:
 
 ```
@@ -163,7 +163,7 @@ because it's caught in the argument-parsing layer.
 not from the `.resc` file's location, so `@firmware/bms-v1.4.elf` resolves to
 `renode_portable/firmware/bms-v1.4.elf`.
 
-### Fix — use the RAMN/mr_canhubk3 variable pattern
+### Fix - use the RAMN/mr_canhubk3 variable pattern
 
 Never hard-code ELF paths in `.resc` files. Use conditional-default variables:
 
@@ -268,7 +268,7 @@ After removing the tester handle entirely:
 ArgumentException: Type "Nullable`1" does not have a "Parse" method with the requested parameters
 ```
 
-### Why — the full picture
+### Why - the full picture
 
 **`SendFrame` is NOT in `CANKeywords.cs` upstream.** The upstream file (`bf3d55e9`, June
 2026) provides these Robot keywords:
@@ -302,18 +302,18 @@ internal method has a different signature, hence every type-mismatch variant.
 
 **Named arguments (`testerId=${MC_TESTER}`) vs. positional:** Renode handles named
 arguments for `[RobotFrameworkKeyword]` methods. Monitor command fallbacks do not support
-named arguments — the keyword dispatcher passes them as positional string literals
+named arguments - the keyword dispatcher passes them as positional string literals
 (`"testerId=0"`), which also causes type failures.
 
 ### How `Create CAN Tester` returns a handle
 
-`CreateCANTester` returns an `int` — the zero-based index of the registered tester in the
+`CreateCANTester` returns an `int` - the zero-based index of the registered tester in the
 `TestersProvider`. Subsequent keywords like `Wait For Frame With Id` accept `int? testerId`
 as a named arg to select which tester to use. With `testerId=null` (default), the first
 registered tester (index 0) is used.
 
 This means: if you create exactly one CANTester, you never need to pass `testerId` to
-`Wait For Frame With Id` — the default selects it automatically.
+`Wait For Frame With Id` - the default selects it automatically.
 
 ### Fix options
 
@@ -364,7 +364,7 @@ when the keyword is registered via `[RobotFrameworkKeyword]`.
 
 The downloaded sample `mr_canhubk3--zephyr-can-counter.elf` is the **loopback variant**.
 Zephyr configures the FlexCAN peripheral in `CAN_MODE_LOOPBACK`. In this mode, frames are
-echoed back inside the CAN controller — they do not propagate to the `CANHub`. The
+echoed back inside the CAN controller - they do not propagate to the `CANHub`. The
 `CANTester` attached to the hub never sees these frames.
 
 The two available sample ELFs:
@@ -375,7 +375,7 @@ The two available sample ELFs:
 | `...-can-counter--no-loopback.elf-s_1959384-...` | Normal (two-machine exchange) | ✅ Yes |
 
 The loopback ELF is what the `S32K3XX_FlexCAN.robot` "Should Receive CAN Frames On
-Loopback" test uses — but it verifies via **UART** (`Wait For Line On Uart    Counter
+Loopback" test uses - but it verifies via **UART** (`Wait For Line On Uart    Counter
 received: 0`), not via CAN frame capture.
 
 ### Fix
@@ -402,7 +402,7 @@ ${BMS_UART_TESTER}=    Create Terminal Tester    sysbus.lpuart2    machine=bms
 
 ---
 
-## 8. `SetGlobalSerialExecution` and quantum — when to use them
+## 8. `SetGlobalSerialExecution` and quantum - when to use them
 
 `emulation SetGlobalSerialExecution True` forces all machine cores to advance in lockstep.
 `emulation SetGlobalQuantum "0.00001"` sets the time slice per synchronisation round.
@@ -426,16 +426,16 @@ you strip out stub ECUs and run a single-firmware test, you can remove these lin
 ${MC_TESTER}=    Create CAN Tester    ${HUB}
 ```
 
-Returns an integer (0, 1, 2, …) — the tester index. Subsequent calls to
+Returns an integer (0, 1, 2, …) - the tester index. Subsequent calls to
 `Wait For Frame With Id`, `Send ISOTP Message`, etc. accept this as the optional
 `testerId` named argument. With `testerId` omitted, tester 0 (the first one created) is
 used.
 
 ```robot
-# Uses tester 0 implicitly — only valid if you created exactly one tester
+# Uses tester 0 implicitly - only valid if you created exactly one tester
 Wait For Frame With Id    0x600    timeout=5
 
-# Explicit — required when you have multiple testers
+# Explicit - required when you have multiple testers
 Wait For Frame With Id    0x600    testerId=${MC_TESTER}    timeout=5
 ```
 
@@ -449,7 +449,7 @@ ${T}=    Create CAN Tester    canHub
 
 ---
 
-## 10. `skip_portable` tag — automatically excluding tests that need a source build
+## 10. `skip_portable` tag - automatically excluding tests that need a source build
 
 The `renode-test` bash script always passes `--exclude "skip_portable"` to Robot
 Framework. Any test tagged `skip_portable` is silently skipped when running with the
@@ -461,7 +461,7 @@ Renode fork) or other features not yet in upstream:
 ```robot
 Motor Controller Emits MC_Heartbeat
     [Tags]    skip_portable
-    [Documentation]    Requires Send Frame keyword — build Renode from simev/renode fork.
+    [Documentation]    Requires Send Frame keyword - build Renode from simev/renode fork.
     [Setup]    Bring Up Network
     Start Emulation
     Send Frame    0x402    00 00
@@ -583,11 +583,11 @@ runMacro $reset
 ```
 
 Key points:
-- `$name?=` and `$bin?=` — conditional defaults; caller overrides before `include`
-- `machine LoadPlatformDescription` — note `tests/peripherals/`, not `platforms/boards/`
-- `false` in `LoadELF` — use physical addresses (not virtual)
-- `sysbus.cpu0` — must specify the primary core for multi-core S32K388
-- `VectorTableOffset` — required; IVT is not at 0x0 for S32K3xx ELF
+- `$name?=` and `$bin?=` - conditional defaults; caller overrides before `include`
+- `machine LoadPlatformDescription` - note `tests/peripherals/`, not `platforms/boards/`
+- `false` in `LoadELF` - use physical addresses (not virtual)
+- `sysbus.cpu0` - must specify the primary core for multi-core S32K388
+- `VectorTableOffset` - required; IVT is not at 0x0 for S32K3xx ELF
 
 ---
 

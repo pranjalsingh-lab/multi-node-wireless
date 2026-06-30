@@ -1,4 +1,4 @@
-# SimEV — Spec 01: ECU Configurator & Descriptor Schema
+# SimEV - Spec 01: ECU Configurator & Descriptor Schema
 
 > **What this document is.** A complete design spec for the first milestone of SimEV: a web
 > app where an EV customer describes each of their ECUs (CAN identity, the frames it
@@ -6,7 +6,7 @@
 > *both* easy for them to fill in *and* directly usable by us to drive a Renode-based CAN
 > simulation later.
 >
-> This milestone produces **no Renode wiring** — only the configurator UI and the data
+> This milestone produces **no Renode wiring** - only the configurator UI and the data
 > model that everything downstream will be generated from. But the schema is designed
 > against the Renode mapping (see §11) so that nothing has to be reworked when we get there.
 >
@@ -22,7 +22,7 @@
 | **Stack** | Next.js 14 + React 18 + TypeScript + Tailwind 3 (App Router, `src/` dir) | Rich UI for DBC upload + editing; same app can later host the results dashboard. Pinned to 14/18/3 because the build host runs **Node 18** and Next 16 / Tailwind 4 require Node ≥20 (see §13). |
 | **Primary input** | **DBC/ARXML import-first, manual entry as fallback** | Every CAN ECU already has a DBC (or AUTOSAR ARXML). Re-typing IDs/signals is the painful, error-prone part. Import it; manual entry covers ECUs without a file and quick edits. |
 | **Milestone 1 scope** | **Configurator + descriptor schema only** | Nail the data model and the entry/import/annotate UI. No Renode generation, no run orchestration this milestone. |
-| **Renode vendoring** | **Deferred** — not pulled into the repo this milestone | `renode` + `renode-infrastructure` are large; the configurator doesn't touch them. Vendor (as submodules) in the simulation milestone (§13). |
+| **Renode vendoring** | **Deferred** - not pulled into the repo this milestone | `renode` + `renode-infrastructure` are large; the configurator doesn't touch them. Vendor (as submodules) in the simulation milestone (§13). |
 
 ---
 
@@ -50,7 +50,7 @@ responses.
 
 ## 2. The core mental model (why the configurator is load-bearing)
 
-**The firmware is a black box, so the contract must be supplied — it cannot be discovered.**
+**The firmware is a black box, so the contract must be supplied - it cannot be discovered.**
 
 Two reasons:
 
@@ -61,7 +61,7 @@ Two reasons:
    can't reliably recover.
 
 In Renode the firmware is **executed**, not parsed: we *stimulate* it and *observe* what comes
-back. Therefore the ECU descriptor the customer fills in is not a convenience — it **is** the
+back. Therefore the ECU descriptor the customer fills in is not a convenience - it **is** the
 specification of the black box:
 
 ```
@@ -71,10 +71,10 @@ ECU descriptor  =  the CAN interface contract  +  the test oracle
 
 Everything downstream keys off this one model:
 
-- **Stimulation** — what frames to inject, at what cadence → from the *contract* (TX cycle
+- **Stimulation** - what frames to inject, at what cadence → from the *contract* (TX cycle
   times) and *intent* (heartbeats, request triggers).
-- **Pass/fail** — did the ECU respond correctly/in time → from the *intent* (expectations).
-- **Fault campaigns** — what to perturb and what should happen → from the *intent* (fault
+- **Pass/fail** - did the ECU respond correctly/in time → from the *intent* (expectations).
+- **Fault campaigns** - what to perturb and what should happen → from the *intent* (fault
   scenarios + heartbeat tolerances).
 
 This is why the schema (§5) is the centerpiece of the whole project, not just this milestone.
@@ -86,7 +86,7 @@ The single most important design idea in the schema:
 | Layer | Comes from | Examples | Who owns it |
 |---|---|---|---|
 | **Contract** | DBC/ARXML import (or manual) | message IDs, DLC, signals, cycle times, sender/receivers | The customer's existing build artifacts |
-| **Intent** | Annotation on top of the contract | "this message is the heartbeat; period 100 ms ±20", "when I send 0x402, expect 0x600 within 50 ms", "signal `PackVoltage` must stay 0–600 V" | **Us, with the customer** — this is the product's value |
+| **Intent** | Annotation on top of the contract | "this message is the heartbeat; period 100 ms ±20", "when I send 0x402, expect 0x600 within 50 ms", "signal `PackVoltage` must stay 0–600 V" | **Us, with the customer** - this is the product's value |
 
 A DBC tells you the messages exist. It does **not** tell you which one is a heartbeat, what a
 request should trigger, what tolerance is acceptable, or what counts as overload. We never make
@@ -111,15 +111,15 @@ contract **without clobbering** the intent annotations.
   import + localStorage autosave (§9).
 - **Structural validation**: whatever Zod gives us for free (types, ranges, required fields).
 
-### Out of scope (later milestones — see §14)
+### Out of scope (later milestones - see §14)
 
 - ARXML *full* parsing (interface scaffolded + detected; deep parse is a fast-follow, §7).
-- Cross-entity **lint** (ID collisions, signal-bit overlap, DLC overflow) — this was the
+- Cross-entity **lint** (ID collisions, signal-bit overlap, DLC overflow) - this was the
   "Configurator + validation" option we did **not** pick; it's M2 (§10).
-- **Renode generation** (`.resc`/`.repl`/`CANTester` stim/Robot) — M3.
-- **Run orchestration** + results/Wireshark dashboard — M4.
-- **Fault-injection execution** — M5.
-- **Encrypted-firmware ingestion / secure-boot emulation** — M6 (the biggest unknown, §15).
+- **Renode generation** (`.resc`/`.repl`/`CANTester` stim/Robot) - M3.
+- **Run orchestration** + results/Wireshark dashboard - M4.
+- **Fault-injection execution** - M5.
+- **Encrypted-firmware ingestion / secure-boot emulation** - M6 (the biggest unknown, §15).
 
 ---
 
@@ -165,7 +165,7 @@ customer hand us a project without our hosting it.
 
 1. **One source of truth**: authored as Zod; TS types are `z.infer`red; JSON Schema can be
    emitted from it if an external consumer needs it.
-2. **Contract vs intent are sibling objects**, never interleaved (§2.1) — re-import refreshes
+2. **Contract vs intent are sibling objects**, never interleaved (§2.1) - re-import refreshes
    `contract`, preserves `intent`.
 3. **Numbers stored as numbers; hex shown in UI.** IDs are stored as integers plus a cached
    hex string for display; we never round-trip through strings for logic.
@@ -183,7 +183,7 @@ Project
 ├── buses[]         CanBus      (one per physical CAN bus in the vehicle)
 └── ecus[]          Ecu
     ├── identity    (id, name, role, vendor, partNumber, description)
-    ├── target      EmulationTarget   (board/cpu/controller model — for Renode later)
+    ├── target      EmulationTarget   (board/cpu/controller model - for Renode later)
     ├── busBindings[]  BusBinding      (which bus via which controller instance)
     ├── firmware    FirmwareRef        (artifact ref, format, encrypted, load addr)
     ├── contract    Contract           ← DBC/ARXML-derived ("what's on the wire")
@@ -223,7 +223,7 @@ Project
 | `role` | enum | `BMS \| MotorController \| VCU \| Telemetry \| Gateway \| BodyControl \| Charger \| Other` |
 | `vendor`, `partNumber`, `description` | string? | optional |
 
-#### `Ecu.target` — `EmulationTarget` (needed for Renode in M3; optional in M1)
+#### `Ecu.target` - `EmulationTarget` (needed for Renode in M3; optional in M1)
 | Field | Type | Notes |
 |---|---|---|
 | `board` | string? | Renode board `.repl`, e.g. `nxp-s32k388evb` |
@@ -234,7 +234,7 @@ Project
 > Defaults to the S32K388 family (8× FlexCAN) since that's the in-tree reference node
 > (§4 of the CAN doc). Customer can override per ECU.
 
-#### `Ecu.busBindings[]` — `BusBinding`
+#### `Ecu.busBindings[]` - `BusBinding`
 | Field | Type | Notes |
 |---|---|---|
 | `busId` | ref→CanBus | which bus |
@@ -243,7 +243,7 @@ Project
 > An ECU may bind to **multiple** buses (a gateway). This is what the Renode generator turns
 > into `connector Connect sysbus.<controllerInstance> <hubForBus>`.
 
-#### `Ecu.firmware` — `FirmwareRef` (metadata only in M1; no upload processing)
+#### `Ecu.firmware` - `FirmwareRef` (metadata only in M1; no upload processing)
 | Field | Type | Notes |
 |---|---|---|
 | `artifact` | string? | filename / hash / handle |
@@ -295,7 +295,7 @@ Project
 | `valueTable` | `Record<int,string>?` | from DBC `VAL_` (enums) |
 | `comment` | string? | |
 
-#### `Intent.heartbeats[]` — `HeartbeatSpec`
+#### `Intent.heartbeats[]` - `HeartbeatSpec`
 | Field | Type | Notes |
 |---|---|---|
 | `messageRef` | ref→message (by id) | the heartbeat frame |
@@ -305,7 +305,7 @@ Project
 | `missedThreshold` | int | N consecutive misses → fault |
 | `expectedReaction` | string? | free text now; structured later (link to an Expectation) |
 
-#### `Intent.expectations[]` — `Expectation` (the oracle: stimulus → required reaction)
+#### `Intent.expectations[]` - `Expectation` (the oracle: stimulus → required reaction)
 | Field | Type | Notes |
 |---|---|---|
 | `id`, `name` | string | |
@@ -323,27 +323,27 @@ Reaction = { kind: 'frame',   messageRef, signalConditions?: SignalCond[] }
 SignalCond = { signal: string, op: '=='|'!='|'<'|'<='|'>'|'>='|'in', value }
 ```
 
-#### `Intent.signalChecks[]` — `SignalCheck` (range / plausibility, for overload/out-of-range)
+#### `Intent.signalChecks[]` - `SignalCheck` (range / plausibility, for overload/out-of-range)
 | Field | Type | Notes |
 |---|---|---|
 | `signalRef` | `{ messageId, signal }` | |
 | `range` | `{ min, max }` | physical-value bounds |
 | `onViolation` | `flag \| fail` | |
 
-#### `Intent.diagnostics` — `Diagnostics`
+#### `Intent.diagnostics` - `Diagnostics`
 | Field | Type | Notes |
 |---|---|---|
 | `isotp` | `{ reqId, respId, addressing: normal\|extended, padding?: int }?` | maps to Renode ISO-TP keywords |
 | `udsServices` | `string[]?` | supported SIDs/DIDs (captured now, exercised in M4/M5) |
 
-#### `Intent.faultScenarios[]` — `FaultScenario` (stub in M1; defines M5 campaigns)
+#### `Intent.faultScenarios[]` - `FaultScenario` (stub in M1; defines M5 campaigns)
 | Field | Type | Notes |
 |---|---|---|
 | `type` | enum | `missedHeartbeat \| busFlood \| malformedFrame \| signalOutOfRange \| dropFrames \| idCollision` |
 | `params` | object | type-specific |
 | `expectedOutcome` | string? | |
 
-### 5.4 Zod sketch (illustrative — not final code)
+### 5.4 Zod sketch (illustrative - not final code)
 
 ```ts
 // src/lib/schema/ecu.ts
@@ -446,7 +446,7 @@ export const Project = z.object({
 export type Project = z.infer<typeof Project>;
 ```
 
-### 5.5 Worked example — BMS descriptor (JSON)
+### 5.5 Worked example - BMS descriptor (JSON)
 
 ```json
 {
@@ -512,7 +512,7 @@ controller, emit/stop the `0x402` heartbeat, and assert the BMS emits `0x600` wi
 
 ### 6.1 What a DBC contains (and how it maps)
 
-A `.dbc` describes a **whole bus** — all nodes, messages, signals. Mapping to our schema:
+A `.dbc` describes a **whole bus** - all nodes, messages, signals. Mapping to our schema:
 
 | DBC construct | Example line | Maps to |
 |---|---|---|
@@ -530,12 +530,12 @@ A `.dbc` describes a **whole bus** — all nodes, messages, signals. Mapping to 
 - **Write our own focused DBC parser** in `src/lib/dbc/` rather than depend on an unmaintained
   npm package. The DBC grammar we need (BU_/BO_/SG_/BA_/VAL_/CM_) is line-oriented and
   well-documented; a targeted parser is more reliable and debuggable than a heavyweight dep.
-- **Output is schema objects**, validated through Zod immediately — so a malformed DBC fails
+- **Output is schema objects**, validated through Zod immediately - so a malformed DBC fails
   loudly at import, not later.
 - **Coverage for M1**: standard + extended IDs, signed/unsigned ints, Intel/Motorola byte
   order, factor/offset/min/max/unit, cycle time, send type, value tables, basic multiplexing,
   comments. **Deferred**: SAE J1939 PGN decomposition, extended multiplexing
-  (`SG_MUL_VAL_`), float/double signal attributes, signal groups — parsed-through or flagged,
+  (`SG_MUL_VAL_`), float/double signal attributes, signal groups - parsed-through or flagged,
   not blocked.
 
 ### 6.3 Import-to-project flow (the UX that makes one DBC populate many ECUs)
@@ -552,7 +552,7 @@ A `.dbc` describes a **whole bus** — all nodes, messages, signals. Mapping to 
    annotations to messages by ID (warn on annotations whose message disappeared).
 
 > This is the payoff of import-first: drop one network DBC, get a populated multi-ECU project,
-> then spend your time on the *intent* layer — the part that's actually yours to define.
+> then spend your time on the *intent* layer - the part that's actually yours to define.
 
 ---
 
@@ -584,17 +584,17 @@ with PDU/frame/cluster indirection. Full parsing is a substantial effort.
 
 ### 8.2 ECU editor tabs
 
-1. **Identity** — id, name, role, vendor/part, description.
-2. **Topology** — bus bindings (bus + controller instance); emulation target (board/cpu/
+1. **Identity** - id, name, role, vendor/part, description.
+2. **Topology** - bus bindings (bus + controller instance); emulation target (board/cpu/
    controller, defaulted to S32K388).
-3. **Firmware** — artifact ref, format, `encrypted` flag, load address, notes. *(Metadata
-   only in M1 — no upload pipeline yet.)*
-4. **Contract** — table of messages (id/name/dir/dlc/cycle), expand a row to edit signals.
+3. **Firmware** - artifact ref, format, `encrypted` flag, load address, notes. *(Metadata
+   only in M1 - no upload pipeline yet.)*
+4. **Contract** - table of messages (id/name/dir/dlc/cycle), expand a row to edit signals.
    Editable by hand; rows imported from DBC are tagged with their source. This is the "what's
    on the wire" view.
-5. **Intent** — the annotation layer, the product's value:
+5. **Intent** - the annotation layer, the product's value:
    - **Heartbeats**: pick a message, set emit/monitor, period, tolerance, missed-threshold.
-   - **Expectations**: a small builder — trigger (frame/silence/sequence) → reaction
+   - **Expectations**: a small builder - trigger (frame/silence/sequence) → reaction
      (frame/noFrame) with signal conditions and a deadline.
    - **Signal checks**: pick message+signal, set range + on-violation.
    - **Diagnostics**: ISO-TP req/resp IDs + addressing; UDS service list.
@@ -615,7 +615,7 @@ with PDU/frame/cluster indirection. Full parsing is a substantial effort.
 | Concern | M1 approach |
 |---|---|
 | Source of truth | the `Project` JSON (validated by the Zod `Project` schema) |
-| Storage | file-based: `data/<projectId>.json` via Next.js API route handlers (`/api/projects`) — human-readable, diffable, git-trackable, and directly consumable by the M3 generator |
+| Storage | file-based: `data/<projectId>.json` via Next.js API route handlers (`/api/projects`) - human-readable, diffable, git-trackable, and directly consumable by the M3 generator |
 | Drafts/autosave | localStorage mirror so in-progress edits survive reloads |
 | Interchange | export (download) / import (upload) a project JSON; lets a customer hand us a project without hosting |
 | Concurrency | single-user assumption in M1; no locking/multi-tenant (revisit when hosted) |
@@ -625,7 +625,7 @@ with PDU/frame/cluster indirection. Full parsing is a substantial effort.
 ## 10. Validation
 
 **In M1 (free with Zod, structural):** required fields, enum membership, numeric ranges, ID
-range vs format, `cycleTimeMs` present for cyclic, `dataBitrate` present for FD buses — these
+range vs format, `cycleTimeMs` present for cyclic, `dataBitrate` present for FD buses - these
 are schema `.refine`s and block bad data at import/save.
 
 **Deferred to M2 (cross-entity *lint*, the "Configurator + validation" option we did not pick
@@ -666,7 +666,7 @@ Renode construct later. Cross-referenced to [`../09-can-networking.md`](../09-ca
 **Known fidelity boundary (carried over from CAN doc §5b):** Renode's `CANHub` does **not**
 model bit-level inter-node arbitration, destructive collisions, lost-arbitration retransmit,
 or busload-dependent latency. So `faultScenarios` of type `busFlood`/`idCollision` that depend
-on *physical* arbitration won't reproduce real timing out of the box — we either scope them to
+on *physical* arbitration won't reproduce real timing out of the box - we either scope them to
 functional effects or extend the hub. The schema can express them; the spec for M5 must note
 which are faithfully simulatable.
 
@@ -709,7 +709,7 @@ simev/
 ### 13.2 Node / package versions (hard constraint)
 
 The build host runs **Node 18.20.8** with no version manager. `create-next-app@latest` pulls
-**Next 16 + Tailwind 4**, both requiring Node ≥20 — they will not run here. Therefore:
+**Next 16 + Tailwind 4**, both requiring Node ≥20 - they will not run here. Therefore:
 
 - **Pin** `next@14`, `react@18`, `tailwindcss@3`, `eslint-config-next@14`.
 - **Cleanup note:** the current `simev/` on disk is a half-created **Next 16** scaffold from an
@@ -756,9 +756,9 @@ The build host runs **Node 18.20.8** with no version manager. `create-next-app@l
 5. **Signal-level oracle expressiveness.** Is the `SignalCond` grammar (compare ops + `in`)
    enough, or do we need computed/derived signal expectations?
 6. **Hosting & multi-tenant.** M1 is single-user/file-based. A hosted product needs auth,
-   per-customer isolation, and a real datastore — out of M1, but the JSON-as-truth design
+   per-customer isolation, and a real datastore - out of M1, but the JSON-as-truth design
    migrates cleanly into a DB later.
-7. **Node 20 migration** (§13.2) — low risk, worth scheduling.
+7. **Node 20 migration** (§13.2) - low risk, worth scheduling.
 
 ---
 
@@ -766,10 +766,10 @@ The build host runs **Node 18.20.8** with no version manager. `create-next-app@l
 
 | Term | Meaning |
 |---|---|
-| **Contract** | The CAN interface facts (IDs, signals, cycle times) — from DBC/ARXML. |
+| **Contract** | The CAN interface facts (IDs, signals, cycle times) - from DBC/ARXML. |
 | **Intent** | Our test annotations (heartbeats, expectations, checks, faults) layered on the contract. |
 | **Oracle** | The set of expectations that decides pass/fail for a stimulus. |
-| **DBC** | Vector CAN database file — the de-facto CAN message/signal definition format. |
+| **DBC** | Vector CAN database file - the de-facto CAN message/signal definition format. |
 | **ARXML** | AUTOSAR XML system/ECU description. |
 | **CANHub** | Renode's idealized broadcast CAN bus (one per bus). |
 | **CANTester** | Renode host-side virtual node used to inject/await frames without firmware. |
@@ -778,5 +778,5 @@ The build host runs **Node 18.20.8** with no version manager. `create-next-app@l
 
 ---
 
-*End of Spec 01. Sibling reference: [`../09-can-networking.md`](../09-can-networking.md) — how
+*End of Spec 01. Sibling reference: [`../09-can-networking.md`](../09-can-networking.md) - how
 Renode models the CAN bus, controllers, stimulation, observability, and fidelity boundaries.*

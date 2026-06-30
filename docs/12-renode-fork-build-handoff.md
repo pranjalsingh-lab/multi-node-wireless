@@ -1,4 +1,4 @@
-# 12 — Renode Fork Build & the I²C Sensor-Registration Bug: Resolved
+# 12 - Renode Fork Build & the I²C Sensor-Registration Bug: Resolved
 
 > **Status: RESOLVED.** The SimEV Renode fork builds, host-side `Send Frame` works,
 > **and** the I²C sensor-registration failure during `Bring Up Network` is fixed.
@@ -10,7 +10,7 @@
 > No such command or device: sysbus.lpi2c0.cell_temp
 > ```
 > The first handoff blamed `runMacro $reset` "dropping" the sensors. **That theory was
-> wrong** (disproven by experiment — see §5). The real cause was a generator heuristic
+> wrong** (disproven by experiment - see §5). The real cause was a generator heuristic
 > (`replDeclaresBus`) that read the `.repl` *at generation time* while Renode loaded a
 > *different copy* at run time. The fix removes the heuristic and always injects the bus
 > controllers (§6). Verified end-to-end through `renode-test` (§7).
@@ -73,7 +73,7 @@ git checkout bf2081844 -- \
   src/Emulator/Extensions/Tools/Network/CANHub.cs   # adds CANHub.AttachTo()
 ```
 `CANTester.cs` is self-contained (`ISOTP_PCI`, `CANMatcher` defined inline). Rebuild
-with `./build.sh --no-gui --skip-fetch` (critical — a submodule update would `reset`
+with `./build.sh --no-gui --skip-fetch` (critical - a submodule update would `reset`
 and wipe these two uncommitted files).
 
 > ⚠️ **These two files are uncommitted working-tree changes in the submodule.** Any
@@ -89,11 +89,11 @@ and wipe these two uncommitted files).
 | `src/lib/renode/runner.ts` | `findRenodeTest()` + `forkRunnerAvailable()`. Prefers `renode/renode-test` when `renode/output/bin` exists, else `~/renode_nightly`, `~/renode_portable`. `RENODE_TEST_PATH` overrides. | Auto-use the fork once built. |
 | `src/app/api/projects/[id]/simulate/run/route.ts` | Use shared `findRenodeTest`; always exclude `skip_firmware_required`; only exclude `skip_portable` when NOT on the fork. **Regenerates the `.resc` artifacts fresh every run** (`generateArtifacts` → temp dir). | On the fork, `Send Frame` works, so injection checks run. The fresh-regenerate means generator fixes take effect immediately (only the `.robot` file comes from the saved copy). |
 | `src/app/api/projects/[id]/simulate/probe/route.ts` | Use shared `findRenodeTest`. | Inject & observe also runs on the fork. |
-| `src/lib/renode/generator.ts` | **Always inject `lpi2c0`/`lpi2c1`** via the two-pass `LoadPlatformDescriptionFromString` (§6). The earlier `replDeclaresBus()` "skip if the board repl already declares it" heuristic was **removed** — it was the bug (§5). | See §5/§6. |
+| `src/lib/renode/generator.ts` | **Always inject `lpi2c0`/`lpi2c1`** via the two-pass `LoadPlatformDescriptionFromString` (§6). The earlier `replDeclaresBus()` "skip if the board repl already declares it" heuristic was **removed** - it was the bug (§5). | See §5/§6. |
 
 ---
 
-## 5. THE BUG — what it actually was (root cause)
+## 5. THE BUG - what it actually was (root cause)
 
 ### Symptom
 Through the full bring-up, the sensor default-value line failed:
@@ -118,12 +118,12 @@ added via `LoadPlatformDescriptionFromString`."* **This is false**, proven three
    anything and never re-runs the platform description. The S32K3 I²C controller's
    `Reset()` (`…/Peripherals/I2C/S32K3XX_LowPowerInterIntegratedCircuit.cs:43-50`)
    resets registers/queues but **keeps `ChildCollection`**. Only `Dispose()`
-   (`…/Core/Structure/SimpleContainer.cs:48-56`) clears children — and Dispose only
+   (`…/Core/Structure/SimpleContainer.cs:48-56`) clears children - and Dispose only
    runs when the machine/peripheral is torn down, not on reset.
 2. **Experiment.** Register a `TMP103` on `lpi2c0`, then `machine Reset`, then read it:
-   `sysbus.lpi2c0.cell_temp Temperature` returns **`0`** — the sensor is **still there**
+   `sysbus.lpi2c0.cell_temp Temperature` returns **`0`** - the sensor is **still there**
    (its value reset to the default), *not* "No such command or device".
-3. **Experiment.** Re-declaring `lpi2c0` does not silently replace it either — it throws
+3. **Experiment.** Re-declaring `lpi2c0` does not silently replace it either - it throws
    a loud `Error E02: Variable 'lpi2c0' was already declared`.
 
 So the CAN hub, `connector Connect`, and the `macro reset` indirection were all **red
@@ -138,7 +138,7 @@ The generator used to decide whether to inject the `lpi2c0`/`lpi2c1` bus control
 But the `.repl` that **Renode loads at run time** (`machine LoadPlatformDescription
 @tests/peripherals/mr_canhubk3.repl`, resolved against Renode's CWD / search path) is
 **not guaranteed to be the same file**. The temp work dir does not contain a copy, so the
-reference resolves to whatever the Renode install bundles — where `lpi2c0`/`lpi2c1` are
+reference resolves to whatever the Renode install bundles - where `lpi2c0`/`lpi2c1` are
 **commented out** (upstream/portable/nightly default):
 ```
 // lpi2c0: I2C.S32K3XX_LowPowerInterIntegratedCircuit @ sysbus 0x40350000
@@ -151,12 +151,12 @@ commented, the generator skipped the injection **and** the platform didn't provi
 | Loaded `.repl` `lpi2c0` | Generator injects? | Result |
 |---|---|---|
 | commented | yes | ✅ works |
-| **commented** | **no (old `replDeclaresBus` skip)** | ❌ **E20 / No such device — the bug** |
+| **commented** | **no (old `replDeclaresBus` skip)** | ❌ **E20 / No such device - the bug** |
 | uncommented | yes | ❌ `E02` already declared |
 | uncommented | no | ✅ works (only if the loaded repl really has it) |
 
 The old heuristic could land in row 2 (skip + commented) whenever the inspected file and
-the loaded file disagreed — which is exactly what produced the intermittent,
+the loaded file disagreed - which is exactly what produced the intermittent,
 "non-deterministic"-looking failures in the first handoff's diagnostic log.
 
 ---
@@ -207,18 +207,18 @@ sysbus.lpi2c0.cell_temp Temperature 25
 > sensor's value to its model default, so the generator registers sensors and sets their
 > default values **after** the last reset (`runMacro $reset`) so values like
 > `Temperature 25` stick. This is why peripheral registration is emitted after the
-> firmware/reset block — *not* because reset would drop the peripheral.
+> firmware/reset block - *not* because reset would drop the peripheral.
 
 ---
 
 ## 7. Verification (all executed, not reasoned)
 
-Reproduced on the upstream **Renode nightly** `v1.16.1` (build `202606290224`, .NET 8) —
+Reproduced on the upstream **Renode nightly** `v1.16.1` (build `202606290224`, .NET 8) -
 the bug needs no `Send Frame`, only the `Bring Up Network` path, so it reproduces without
 a fork build. The nightly's bundled `mr_canhubk3.repl` has `lpi2c0` commented (the
 bug-triggering condition).
 
-> The same bundled **portable/nightly** binary is all you need to validate a *fresh* platform too —
+> The same bundled **portable/nightly** binary is all you need to validate a *fresh* platform too -
 > it runs the [doc 06 §6.1](06-generating-a-new-board.md#61-static-load-test-fastest-signal) load oracle
 > and `cpu Step` without a source build or `dotnet`. Confirmed here by load-testing and single-stepping a
 > from-scratch `mgs2401.repl` (Shakti C-class) against this exact portable.
@@ -247,14 +247,14 @@ Bug variant (no `lpi2c0` pass) fails at setup with E20; fixed variant passes.
 
 ---
 
-## 8. Secondary / known issues (NOT the I²C bug — still open)
+## 8. Secondary / known issues (NOT the I²C bug - still open)
 
 1. **Stub "Emits X_Heartbeat" tests are semantically broken.** For a no-firmware ECU, the
    generator emits `Send Frame 0x402` then `Wait For Frame With Id 0x402` on the *same*
    tester, with the hub created **non-loopback**. A non-loopback hub does not echo a frame
    back to its sender, so these **time out even when injection works**. Options: loopback
    hub for these, two testers, or rethink what a stub "emits" means.
-2. **`skip_firmware_required`** still excludes cross-ECU fault reactions and UDS tests —
+2. **`skip_firmware_required`** still excludes cross-ECU fault reactions and UDS tests -
    they need real ECU firmware. `renode/firmware/` now contains ELFs for all nodes
    (`bms/mc/vcu/tcu/gw/obc/telem.elf`), but `data/demo-ev.json` only wires `bms` to
    firmware; others are stubs. Wiring the rest is untested.
@@ -263,30 +263,30 @@ Bug variant (no `lpi2c0` pass) fails at setup with E20; fixed variant passes.
 4. **Saved `data/demo-ev-tests.robot`** is a user-owned copy of the generated `.robot`
    (per [doc 11 §8](11-peripheral-registration-debugging.md)). This bug's fix is in
    `.resc` generation (regenerated fresh every run), so the saved `.robot` isn't made
-   stale by it — but if you change `generateRobotTest`, delete the saved file so the
+   stale by it - but if you change `generateRobotTest`, delete the saved file so the
    GET endpoint regenerates it.
 
 ---
 
 ## 9. File inventory (what changed across both sessions)
 
-**Fork (uncommitted — see §3 warning):**
+**Fork (uncommitted - see §3 warning):**
 - `renode/src/Infrastructure/src/Emulator/Main/Testing/CANTester.cs` (added from `bf2081844`)
 - `renode/src/Infrastructure/src/Emulator/Extensions/Tools/Network/CANHub.cs` (updated from `bf2081844`)
 - `renode/output/**` (build artifacts)
-- `renode/tests/peripherals/mr_canhubk3.repl` — **must keep `lpi2c0`/`lpi2c1` commented** (§6 contract)
+- `renode/tests/peripherals/mr_canhubk3.repl` - **must keep `lpi2c0`/`lpi2c1` commented** (§6 contract)
 
 **App:**
 - `src/lib/renode/runner.ts` (new)
 - `src/app/api/projects/[id]/simulate/run/route.ts`, `…/simulate/probe/route.ts`
-- `src/lib/renode/generator.ts` — **removed `replDeclaresBus`; always inject `lpi2c0`/`lpi2c1`** (the fix); corrected the reset comment
+- `src/lib/renode/generator.ts` - **removed `replDeclaresBus`; always inject `lpi2c0`/`lpi2c1`** (the fix); corrected the reset comment
 
 ---
 
 ## 10. TL;DR for whoever picks this up
-1. The fork builds and `Send Frame` works — **don't redo that.** Protect the two
+1. The fork builds and `Send Frame` works - **don't redo that.** Protect the two
    submodule files (§3) from `git submodule update`.
-2. The I²C sensor bug is **fixed.** It was never about reset — it was a
+2. The I²C sensor bug is **fixed.** It was never about reset - it was a
    generation-time/run-time `.repl` mismatch. The generator now always injects the bus
    controllers (§6). Keep `lpi2c0`/`lpi2c1` **commented** in the loaded `.repl`.
 3. Remaining work is the **stub-heartbeat loopback** issue (§8.1) so the demo's green

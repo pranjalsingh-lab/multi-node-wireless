@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Prepares the lab. Skips the (~100 MB) engine download if you already have a
-# Renode build — set RENODE_PATH or keep a build at ../renode or ~/renode.
+# Renode build - set RENODE_PATH or keep a build at ../renode or ~/renode.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -17,7 +17,7 @@ fi
 if [ -n "$have_engine" ]; then
   echo "==> Using existing Renode build: $have_engine  (skipping engine download)"
 elif [ "$(uname -s)" = "Linux" ]; then
-  echo "==> No Renode build found — downloading portable engine (~100 MB)…"
+  echo "==> No Renode build found - downloading portable engine (~100 MB)…"
   mkdir -p vendor/renode
   curl -L --retry 3 https://builds.renode.io/renode-latest.linux-portable.tar.gz \
     | tar xz --strip-components=1 -C vendor/renode

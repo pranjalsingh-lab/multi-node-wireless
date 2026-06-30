@@ -1,6 +1,6 @@
-# 11 — Peripheral Registration Debugging: The Simulation Layer War Stories
+# 11 - Peripheral Registration Debugging: The Simulation Layer War Stories
 
-> Everything that broke while building the SimEV simulation environment — the `.resc`
+> Everything that broke while building the SimEV simulation environment - the `.resc`
 > generator, I2C sensor registration, peripheral name resolution, and the SSE streaming
 > layer. Each section follows the same structure: *what the error said*, *why it happened*,
 > *how it was fixed*, *what to watch for next time*.
@@ -26,7 +26,7 @@ All five errors below occurred while getting the first run to pass end-to-end.
 
 ---
 
-## 1. Hyphen in peripheral identifiers — `Error E00: Syntax error, unexpected '-'`
+## 1. Hyphen in peripheral identifiers - `Error E00: Syntax error, unexpected '-'`
 
 ### The error
 
@@ -66,7 +66,7 @@ Applied at every site where peripheral IDs appear in generated Renode output:
 | `.resc` default-value command | `cell-temp Temperature 25` | `cell_temp Temperature 25` |
 | Robot test `Execute Command` | `cell-temp Temperature 25` | `cell_temp Temperature 25` |
 
-The schema ID (`"cell-temp"`) is unchanged — `replId()` is a display transform only,
+The schema ID (`"cell-temp"`) is unchanged - `replId()` is a display transform only,
 applied at generator output time.
 
 ### Rule
@@ -77,7 +77,7 @@ site.
 
 ---
 
-## 2. `lpi2c0` not defined — `Error E20: Undefined register`
+## 2. `lpi2c0` not defined - `Error E20: Undefined register`
 
 ### The error
 
@@ -100,7 +100,7 @@ The portable `renode_nightly` binary ships a **bundled copy** of
 ```
 
 Uncommenting them in the `renode/` submodule `.repl` file has **no effect** on a portable
-build — the submodule source is not compiled into the portable binary. The portable reads
+build - the submodule source is not compiled into the portable binary. The portable reads
 the bundled copy from its own extracted directory.
 
 When `cell_temp: Sensors.TMP103 @ lpi2c0 72` is processed, `lpi2c0` is not in the machine,
@@ -137,7 +137,7 @@ pack_monitor: Sensors.PAC1934 @ lpi2c0 16
 """
 ```
 
-### Submodule vs portable — what each source controls
+### Submodule vs portable - what each source controls
 
 | Source | Affects |
 |---|---|
@@ -150,11 +150,11 @@ regardless of whether the user runs portable or source.
 
 ---
 
-## 3. `LoadPlatformDescriptionFromString` is single-pass — `Error E20` after "fixing" §2
+## 3. `LoadPlatformDescriptionFromString` is single-pass - `Error E20` after "fixing" §2
 
 ### The error
 
-Same `Error E20: Undefined register '[ReferenceValue: lpi2c0]'` — even after moving
+Same `Error E20: Undefined register '[ReferenceValue: lpi2c0]'` - even after moving
 `lpi2c0` and `cell_temp` into the same `LoadPlatformDescriptionFromString` block:
 
 ```
@@ -171,7 +171,7 @@ cell_temp: Sensors.TMP103 @ lpi2c0 72
 `LoadPlatformDescriptionFromString` (like `.repl` file loading) is **single-pass**.
 Declarations are processed in order, top-to-bottom. When the `cell_temp` line is parsed,
 `lpi2c0` has been *declared in this fragment* but has **not yet been committed to the
-machine** — the entire fragment is assembled and type-checked before any of its objects
+machine** - the entire fragment is assembled and type-checked before any of its objects
 are registered in the machine's peripheral map.
 
 The forward reference to `lpi2c0` in `@ lpi2c0 72` therefore fails with E20.
@@ -183,9 +183,9 @@ peripheral from within the same declaration block before it has been fully const
 
 Two separate `LoadPlatformDescriptionFromString` calls:
 
-1. **Pass 1** — bus controllers only. After this call returns, `lpi2c0` exists in the
+1. **Pass 1** - bus controllers only. After this call returns, `lpi2c0` exists in the
    machine.
-2. **Pass 2** — sensor registrations. `lpi2c0` is now a live object, so `@ lpi2c0 72`
+2. **Pass 2** - sensor registrations. `lpi2c0` is now a live object, so `@ lpi2c0 72`
    resolves correctly.
 
 ```typescript
@@ -199,7 +199,7 @@ if (busSupplements.length > 0) {
   lines.push(`"""`);
 }
 
-// Pass 2: register sensors — buses exist in the machine now
+// Pass 2: register sensors - buses exist in the machine now
 lines.push(`\nmachine LoadPlatformDescriptionFromString """`);
 for (const p of peripherals) {
   const loc = p.busBinding.busType === "i2c"
@@ -219,7 +219,7 @@ before the sensors that use it.
 
 ---
 
-## 4. I2C slaves are not in the machine's top-level name map — `No such command or device`
+## 4. I2C slaves are not in the machine's top-level name map - `No such command or device`
 
 ### The error
 
@@ -229,7 +229,7 @@ No such command or device: cell_temp
 ```
 
 This error appeared in the `.resc` after the two-pass `LoadPlatformDescriptionFromString`
-(§3) apparently succeeded — the sensor was declared without an E20 error, but then trying
+(§3) apparently succeeded - the sensor was declared without an E20 error, but then trying
 to set its default value with `cell_temp Temperature 25` failed.
 
 The same error appeared in the Robot test's `Bring Up Network`:
@@ -238,7 +238,7 @@ The same error appeared in the Robot test's `Bring Up Network`:
 Execute Command    cell_temp Temperature 25
 ```
 
-### Why — the `SimpleContainer<T>` name-map issue
+### Why - the `SimpleContainer<T>` name-map issue
 
 Renode's Monitor resolves a bare name (e.g., `cell_temp`) by looking it up in the
 machine's top-level peripheral name map. I2C slaves registered `@ lpi2c0 72` are **not
@@ -283,7 +283,7 @@ In `generator.ts`, wherever an I2C peripheral's property is set via Monitor comm
 prefix the name with `sysbus.<busName>.<peripheralId>` instead of just the bare name:
 
 ```typescript
-// generateEcuResc — .resc default value commands
+// generateEcuResc - .resc default value commands
 const prefix = p.busBinding.busType === "i2c"
   ? `sysbus.${replId(p.busBinding.controller)}.${replId(p.id)}`
   : replId(p.id);
@@ -291,7 +291,7 @@ lines.push(`${prefix} ${dv.property} ${formatPeripheralValue(dv.value)}`);
 ```
 
 ```typescript
-// generateRobotTest — Bring Up Network default values
+// generateRobotTest - Bring Up Network default values
 const prefix = p.busBinding.busType === "i2c"
   ? `sysbus.${replId(p.busBinding.controller)}.${replId(p.id)}`
   : replId(p.id);
@@ -299,7 +299,7 @@ lines.push(`    Execute Command    ${prefix} ${dv.property} ${formatPeripheralVa
 ```
 
 ```typescript
-// generateRobotTest — per-test peripheralSetup overrides
+// generateRobotTest - per-test peripheralSetup overrides
 const periph = project.ecus
   .flatMap((e) => e.peripherals ?? [])
   .find((p) => p.id === entry.peripheralId);
@@ -315,10 +315,10 @@ Generated output for the BMS example:
 # .resc
 sysbus.lpi2c0.cell_temp Temperature 25
 
-# Robot test — Bring Up Network
+# Robot test - Bring Up Network
     Execute Command    sysbus.lpi2c0.cell_temp Temperature 25
 
-# Robot test — per-test override
+# Robot test - per-test override
     Execute Command    mach set "bms"
     Execute Command    sysbus.lpi2c0.cell_temp Temperature 85
 ```
@@ -334,7 +334,7 @@ The pattern generalises to SPI: `sysbus.<spi_controller>.<sensor_name>`.
 
 ---
 
-## 5. Firmware artifact path and format mismatch — `Parameters did not match the signature of LoadELF`
+## 5. Firmware artifact path and format mismatch - `Parameters did not match the signature of LoadELF`
 
 ### The error
 
@@ -345,7 +345,7 @@ Parsing line 'sysbus LoadELF $bin false sysbus.cpu0' failed
 
 The sub-errors showed the file validator throwing before `LoadELF` even ran.
 
-### Why — three compounding issues
+### Why - three compounding issues
 
 **5a. Wrong filename.** `demo-ev.json` had `"artifact": "firmware/bms-main.elf"` but the
 compiled binary in `renode/firmware/` is `bms.elf`. The path validator threw because
@@ -382,18 +382,18 @@ await Promise.all(
 ### Rule
 
 The run API creates a self-contained temp work directory. Every file that a `.resc` or
-`.robot` file references — ELFs, Python scripts, the platform `.repl` — must either be
+`.robot` file references - ELFs, Python scripts, the platform `.repl` - must either be
 resolved via `path add @${EXECDIR}` (which adds the temp dir to Renode's path search) or
 be physically copied into the temp directory. ELFs are not path-searched; they must be
 present at the resolved path.
 
 ---
 
-## 6. PAC1934 — non-existent default value properties
+## 6. PAC1934 - non-existent default value properties
 
 ### The error
 
-No explicit Renode error — but the demo-ev.json had:
+No explicit Renode error - but the demo-ev.json had:
 
 ```json
 "defaultValues": [
@@ -423,7 +423,7 @@ the Monitor.
 
 ---
 
-## 7. SSE stream `ERR_INVALID_STATE` — writing to a closed ReadableStream controller
+## 7. SSE stream `ERR_INVALID_STATE` - writing to a closed ReadableStream controller
 
 ### The error (Next.js server console)
 
@@ -512,7 +512,7 @@ guaranteed, and buffered I/O events routinely arrive after the process `close` e
 
 ### What happened
 
-The generator was updated (fix for §4 — I2C sysbus path), but the saved test file in
+The generator was updated (fix for §4 - I2C sysbus path), but the saved test file in
 `data/demo-ev-tests.robot` was regenerated before the fix. It continued to contain the
 old short-name syntax (`cell_temp Temperature 25` instead of
 `sysbus.lpi2c0.cell_temp Temperature 25`). Each run used the stale file and continued to
@@ -522,7 +522,7 @@ fail.
 
 The simulate page's GET endpoint returns the saved file from `data/<id>-tests.robot` if
 it exists, falling back to a fresh generator run only if the file is absent. Once a file
-has been saved — even automatically — it is never re-regenerated unless the user clicks
+has been saved - even automatically - it is never re-regenerated unless the user clicks
 **Reset**.
 
 ### Fix
@@ -558,7 +558,7 @@ The following entries extend the checklist in [doc 10, §11](./10-robot-testing-
     → lpi2c0/lpi2c1 are commented out in the portable build's bundled mr_canhubk3.repl.
       The missingBusDecls table in the generator must declare them inline.
       Also check: are bus and sensor in the same LoadPlatformDescriptionFromString block?
-      (See §3 — single-pass rule.)
+      (See §3 - single-pass rule.)
 
 11. "No such command or device: <sensor_name>"
     → I2C (and SPI) slaves are not in the machine's top-level name map.
@@ -577,7 +577,7 @@ The following entries extend the checklist in [doc 10, §11](./10-robot-testing-
 
 ---
 
-## 10. Summary table — errors, root causes, fixes
+## 10. Summary table - errors, root causes, fixes
 
 | # | Error message | Root cause | Fix location |
 |---|---|---|---|

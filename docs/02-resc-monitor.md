@@ -1,4 +1,4 @@
-# 02 — The `.resc` Script Format & the Monitor
+# 02 - The `.resc` Script Format & the Monitor
 
 > `.resc` = **RE**node **SC**ript. A sequence of **Monitor commands** that *set up and run*
 > an emulation: create machines, load `.repl` platforms, load firmware, configure
@@ -33,7 +33,7 @@ line ──► Monitor.Parse ──► Tokenize ──► split on ';' ──►
 - `.resc` file: `include`'s executor reads the file and calls `Parse(line)` once per logical
   line (`Monitor.TryExecuteScript`, `Monitor.cs:308-373`, esp. `:360-367`).
 
-The extension `.resc` is a **convention only** — nothing checks it. `IncludeFileCommand`
+The extension `.resc` is a **convention only** - nothing checks it. `IncludeFileCommand`
 routes any non-`.py`/`.cs`/`.repl` file to the Monitor-script path
 (`Commands/IncludeFileCommand.cs:80-95`). The only script-specific behaviors are:
 1. `$ORIGIN` is set to the script's own directory while it runs (`Monitor.cs:322-323`,
@@ -63,10 +63,10 @@ routes any non-`.py`/`.cs`/`.repl` file to the Monitor-script path
 - On `RecoverableException`, if `monitor:break-script-on-exception` is true (default) the
   rest of the script aborts (`:256-299`).
 
-### `ExecuteCommand` — resolution order (`Monitor.cs:663-731`)
+### `ExecuteCommand` - resolution order (`Monitor.cs:663-731`)
 Given the first token, the Monitor tries, **in this order**:
 
-1. **Variable assignment** — `VAR = value` or `VAR ?= value` (`?=` only if undefined).
+1. **Variable assignment** - `VAR = value` or `VAR ?= value` (`?=` only if undefined).
 2. **Built-in command** whose name matches (e.g. `mach`, `include`, `start`).
 3. **Object/peripheral name** is available → dispatch a *member* call (e.g.
    `sysbus LoadELF …`, `cpu PC 0x0`). Honors `using` prefixes.
@@ -76,7 +76,7 @@ Given the first token, the Monitor tries, **in this order**:
 7. **Python builtin** `mc_<name>` from `scripts/monitor.py`.
 8. Else: *"No such command or device"*.
 
-This order is why a peripheral named like a command could shadow nothing — built-ins win.
+This order is why a peripheral named like a command could shadow nothing - built-ins win.
 
 ---
 
@@ -97,7 +97,7 @@ Highlights:
 | `HexToken` / numeric / `TimeIntervalToken` | `0x…` / `123` / `h:m:s.frac` | literals |
 | `CommandSplit` | `^;` | statement separator |
 | `LiteralToken` | `^[\w.\-?][\w.\-?:]*` | command / member / peripheral name |
-| `CommentToken` | `^:.*` | `:` comment — **lowest priority** |
+| `CommentToken` | `^:.*` | `:` comment - **lowest priority** |
 
 **Two comment syntaxes, asymmetric** (commonly misunderstood):
 - `#` starts a comment anywhere a token may begin.
@@ -119,8 +119,8 @@ Three dictionaries: `variables`, `macros`, `aliases` (`Monitor.cs:1310-1313`). N
 macro means the right thing under each machine.
 
 ### Assignment
-- `$x = value` — always set.
-- `$x ?= value` — set **only if undefined** (`ConditionalEqualityToken`). This is the
+- `$x = value` - always set.
+- `$x ?= value` - set **only if undefined** (`ConditionalEqualityToken`). This is the
   override hook: a script writes `$bin?=@default.elf`, and automation can pre-set `$bin`
   (e.g. `renode -e '$bin=@my.elf' script.resc`) to override it.
 
@@ -128,7 +128,7 @@ macro means the right thing under each machine.
 - **`$CWD`** = process working directory at startup (`global.CWD`, `Monitor.cs:64,77`).
 - **`$ORIGIN`** = directory of the *currently executing script* (set per-include,
   `Monitor.cs:322-323`). Use it for **relocatable includes**: `i $ORIGIN/sub.resc`.
-- `$bin`, `$name`, `$id1`, … are ordinary user variables — conventions, no magic.
+- `$bin`, `$name`, `$id1`, … are ordinary user variables - conventions, no magic.
 - Environment variables are not directly addressable (no `$ENV`), except `STARTUP_COMMAND`
   (injected as the shell's first command, `Monitor.cs:564`) and via embedded Python
   (`os.environ`).
@@ -148,11 +148,11 @@ are **not** hard-coded commands. They are reflected member calls on bound object
 
 - The first token names an object: a peripheral of the current machine (`sysbus`,
   `cpu`, `uart0`, …) or a bound singleton (`machine`, `emulation`, `connector`, `plugins`,
-  `EmulationManager`, `sockets` — `Monitor.cs:1021-1026`).
+  `EmulationManager`, `sockets` - `Monitor.cs:1021-1026`).
 - The second token names a **method / property / field / indexer** on that object's type.
   - method → call it; property/field with no arg → get; with an arg → set
     (`cpu PerformanceInMips 125`, `cpu PC 0x0`).
-  - **extension methods** count too (discovered via `TypeManager.GetExtensionMethods`) — this
+  - **extension methods** count too (discovered via `TypeManager.GetExtensionMethods`) - this
     is how `LoadELF`, `LoadFdt`, `CreateSwitch`, `SetGlobalQuantum` attach to types they
     don't declare. `LoadPlatformDescription` is likewise an extension method on `Machine`.
   - reference-typed members can be **chained** (`machine SystemBus …`).
@@ -162,7 +162,7 @@ are **not** hard-coded commands. They are reflected member calls on bound object
   objects; enum names parse; etc.
 
 **What's exposed**: members are filtered by `TypeExtensions.IsCallable`
-(`src/Emulator/Extensions/Utilities/TypeExtensions.cs:30-189`) — every parameter type must be
+(`src/Emulator/Extensions/Utilities/TypeExtensions.cs:30-189`) - every parameter type must be
 convertible from a Monitor token, and the member must not be marked `[HideInMonitor]`
 (`src/Emulator/Main/UserInterface/HideInMonitorAttribute.cs`). `[UiAccessible]` only supplies
 a friendly name. (Again: **no `[RunOnVirtualTime]`** exists.)
@@ -175,30 +175,30 @@ list their values, images render inline.
 
 ## 6. Command reference (the ones you'll actually see in `.resc`)
 
-### Machine management — `mach`
+### Machine management - `mach`
 `Commands/MachCommand.cs` (name `mach`):
-- `mach create` — new machine, generic name, **selected** (`:117-131`).
-- `mach create "name"` — new **named** machine, selected (`:109-113`).
-- `mach add "name"` — new machine; selected only if none active (`:81-88`).
-- `mach set "name"` / `mach set <n>` — select existing.
-- `mach clear` — deselect (current = null) (`:122-124`).
-- `mach rem "name"` — remove. `mach` alone lists machines.
+- `mach create` - new machine, generic name, **selected** (`:117-131`).
+- `mach create "name"` - new **named** machine, selected (`:109-113`).
+- `mach add "name"` - new machine; selected only if none active (`:81-88`).
+- `mach set "name"` / `mach set <n>` - select existing.
+- `mach clear` - deselect (current = null) (`:122-124`).
+- `mach rem "name"` - remove. `mach` alone lists machines.
 
 Selecting sets the prompt to `(name)`. Switching machines changes which peripherals/variables
 are in scope.
 
-### `using` (Monitor prefix — *not* the `.repl` include)
+### `using` (Monitor prefix - *not* the `.repl` include)
 `Commands/UsingCommand.cs`: `using sysbus` appends the prefix `sysbus.` so `sysbus.uart0` is
 reachable as `uart0` (`:42-57`). `using -` clears all.
 > **`sysbus.` is already a default prefix** (`MonitorCommands.cs:1567`), so `using sysbus` is
 > conventional but redundant (de-duped, harmless). `using` survives `mach create` and
 > emulation reset.
 
-### Load a platform — `machine LoadPlatformDescription` / `…FromString`
+### Load a platform - `machine LoadPlatformDescription` / `…FromString`
 Extension methods on `Machine` (in the `renode` tree,
 `PlatformDescriptionMachineExtensions.cs:18` / `:23`):
-- `machine LoadPlatformDescription @platforms/boards/x.repl` — load a `.repl` file.
-- `machine LoadPlatformDescriptionFromString """ <inline repl> """` — inline `.repl`.
+- `machine LoadPlatformDescription @platforms/boards/x.repl` - load a `.repl` file.
+- `machine LoadPlatformDescriptionFromString """ <inline repl> """` - inline `.repl`.
 
 These call into the `CreationDriver` (the whole of [doc 01](01-repl-format.md) /
 [doc 04](04-repl-to-csharp-bridge.md)).
@@ -210,7 +210,7 @@ These call into the `CreationDriver` (the whole of [doc 01](01-repl-format.md) /
   Monitor script.
 - `i @scripts/single-node/x.resc`, or relative to the including script via `i $ORIGIN/x.resc`.
 
-### Load firmware — `sysbus LoadELF / LoadBinary / LoadUImage / LoadFdt`
+### Load firmware - `sysbus LoadELF / LoadBinary / LoadUImage / LoadFdt`
 Reflected calls/extensions on `sysbus`:
 - `sysbus LoadELF $bin` (`Core/Extensions/FileLoaderExtensions.cs:417`,
   `LoadELF(file, useVirtualAddress=false, cpu=null)`).
@@ -219,10 +219,10 @@ Reflected calls/extensions on `sysbus`:
   (`MachineExtensions.cs:56`).
 
 ### `showAnalyzer` / `sa`
-`Commands/ShowBackendAnalyzerCommand.cs`: open a backend window/terminal for a peripheral —
+`Commands/ShowBackendAnalyzerCommand.cs`: open a backend window/terminal for a peripheral -
 `showAnalyzer sysbus.uart4`. No-op if analyzers are hidden (`--hide-analyzers`).
 
-### Run control — `start` / `s`, `pause` / `p`
+### Run control - `start` / `s`, `pause` / `p`
 - `start` → `Emulation.StartAll()` (`Commands/StartCommand.cs`). `start @path` runs a script
   then starts.
 - `pause` / `p` → `Emulation.PauseAll()`.
@@ -259,7 +259,7 @@ runMacro $reset
 
 ### `set` / `macro` / `alias`, `runMacro` / `execute`
 - `set NAME value` (variable), `macro NAME """…"""` (macro), `alias NAME value` (command
-  alias) — three instances of `SetCommand`. With no value they enter interactive multi-line
+  alias) - three instances of `SetCommand`. With no value they enter interactive multi-line
   capture.
 - `runMacro $name` / `execute $var` split the stored string on newlines and `Parse` each line.
 
@@ -278,7 +278,7 @@ Renode root by default (the Monitor `chdir`s there at startup, `Monitor.cs:566-5
 ## 7. Startup: launcher → Monitor
 
 - **`renode`** (bash launcher, `renode/renode`) strips its own flags and
-  `exec dotnet Renode.dll "$@"` — every other arg is forwarded.
+  `exec dotnet Renode.dll "$@"` - every other arg is forwarded.
 - **`Program.Main`** (`renode/src/Renode/Program.cs`) parses argv into `Options` and runs
   `CommandLineInterface.Run`.
 - **`Options`** (`renode-infrastructure/src/UI/Options.cs`): positional arg 0 = the
@@ -290,7 +290,7 @@ Renode root by default (the Monitor `chdir`s there at startup, `Monitor.cs:566-5
   `Load` snapshot), then appends the `-e` commands.
 
 So `renode myscript.resc -e 'start'` becomes, inside the shell:
-`i $CWD/myscript.resc` then `start` — both ordinary Monitor lines.
+`i $CWD/myscript.resc` then `start` - both ordinary Monitor lines.
 
 ---
 
@@ -347,20 +347,20 @@ mach clear                                        # deselect, then repeat for no
 
 ## 9. Gotchas (verified)
 
-1. **`.resc` is not special** — same parser as the prompt; the extension isn't checked.
-2. **`using sysbus` is redundant** — `sysbus.` is a default prefix.
-3. **`reset` is a macro** — define `macro reset """…"""` and end with `runMacro $reset`.
-4. **Two comment syntaxes** — `#` anywhere; `:` only at a token boundary (hence `:name:`
+1. **`.resc` is not special** - same parser as the prompt; the extension isn't checked.
+2. **`using sysbus` is redundant** - `sysbus.` is a default prefix.
+3. **`reset` is a macro** - define `macro reset """…"""` and end with `runMacro $reset`.
+4. **Two comment syntaxes** - `#` anywhere; `:` only at a token boundary (hence `:name:`
    headers). Both run to end of line.
-5. **`?=`** assigns only if undefined — the override hook for automation/`-e`.
-6. **Variables are machine-scoped** — bare `$x` is machine-local first, then `global.`.
-7. **`$ORIGIN` (script dir) vs `$CWD` (process start dir)** — use `$ORIGIN` for relocatable
+5. **`?=`** assigns only if undefined - the override hook for automation/`-e`.
+6. **Variables are machine-scoped** - bare `$x` is machine-local first, then `global.`.
+7. **`$ORIGIN` (script dir) vs `$CWD` (process start dir)** - use `$ORIGIN` for relocatable
    includes.
-8. **Numbers print/parse in hex by default** — toggle with `numbersMode`.
+8. **Numbers print/parse in hex by default** - toggle with `numbersMode`.
 9. **`machine LoadPlatformDescription` is an extension method** in the `renode` tree, surfaced
    through the same reflection dispatch as any peripheral method.
 
 ---
 
-Next: [`03-csharp-peripherals.md`](03-csharp-peripherals.md) — how the C# device models that
+Next: [`03-csharp-peripherals.md`](03-csharp-peripherals.md) - how the C# device models that
 `.repl` instantiates are written.

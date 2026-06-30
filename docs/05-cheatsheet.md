@@ -1,4 +1,4 @@
-# 05 — Cheatsheet & Recipes
+# 05 - Cheatsheet & Recipes
 
 Copy-pasteable patterns. Each links to the full explanation. Synthetic snippets are labeled;
 others are adapted from real `renode`/`renode-infrastructure` files.
@@ -193,7 +193,7 @@ Real example: `platforms/boards/stm32f4_discovery.repl`
 
 > Bringing up a chip Renode doesn't support yet (writing the CPU `.repl` itself, not just a
 > board on top of it)? That's the full playbook in
-> [doc 06](06-generating-a-new-board.md) — where each line comes from (SVD vs datasheet) and how
+> [doc 06](06-generating-a-new-board.md) - where each line comes from (SVD vs datasheet) and how
 > to verify it by loading it in Renode.
 
 ---
@@ -218,10 +218,10 @@ Real example: `platforms/boards/stm32f4_discovery.repl`
 
 - `.repl` indentation is **exactly 4 spaces**; tabs don't count.
 - `.repl` `//` comments must be at line start or preceded by a space (so `http://` is safe).
-- `@` means **bus address** in a registration but **input index** in an IRQ — don't conflate.
+- `@` means **bus address** in a registration but **input index** in an IRQ - don't conflate.
 - `@ sysbus 0xADDR` needs the peripheral to be `IKnownSize`; otherwise use `<addr, +size>`.
 - A property is `.repl`-settable only with a **public setter** (`{ get; set; }`).
 - `.resc`/Monitor: `reset` is a **macro** (`macro reset """…"""` + `runMacro $reset`), not a command.
 - `.resc` numbers print/parse in **hex** by default (`numbersMode` toggles).
-- `$x ?= value` sets only if undefined — the override hook for `-e '$x=...'`.
+- `$x ?= value` sets only if undefined - the override hook for `-e '$x=...'`.
 - `.repl` `using` = include a file; Monitor `using` = add a name prefix. Unrelated.

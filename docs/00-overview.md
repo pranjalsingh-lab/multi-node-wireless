@@ -1,4 +1,4 @@
-# 00 — Overview & Mental Model
+# 00 - Overview & Mental Model
 
 > Read this first. It gives you the vocabulary and the end-to-end picture so the
 > detailed docs make sense.
@@ -7,7 +7,7 @@
 
 Renode is a **full-system functional emulator** for embedded/IoT systems. You point it at
 a description of a board (CPU + memory + peripherals) and a firmware binary, and it runs
-that firmware against simulated hardware — including multi-node networks of boards.
+that firmware against simulated hardware - including multi-node networks of boards.
 
 A running Renode session contains an **Emulation** which holds one or more **Machines**.
 A *Machine* is one virtual board: it owns a **system bus** (`sysbus`) onto which
@@ -78,16 +78,16 @@ The bridge from a `.repl` type name like `UART.STM32F7_USART` to a live C# objec
 
 ## Glossary
 
-- **Emulation** — the top-level container; holds all machines, the global clock/quantum, shared media (network/UART hubs). Bound in the Monitor as `emulation`.
-- **Machine** — one virtual board. Implements `IMachine`. Creates and names its `sysbus` in its constructor. Bound in the Monitor as `machine`; selected via `mach`.
-- **`sysbus` (system bus)** — the address space onto which peripherals are mapped. An `IBusController`/`SystemBus`. Available in `.repl` as the implicit variable `sysbus` and in the Monitor as the peripheral name `sysbus`.
-- **Peripheral** — any device model implementing `IPeripheral`. Bus-mappable ones implement `IBusPeripheral` + a width interface (`IDoubleWordPeripheral`, …) and usually `IKnownSize`.
-- **Registration / registration point** — *where* a peripheral attaches to its parent. On the bus: an address (`BusPointRegistration`), an address range (`BusRangeRegistration`), or nothing (`NullRegistrationPoint`). Under a non-bus parent (e.g. a GPIO port): a number (`NumberRegistrationPoint<T>`).
-- **GPIO / IRQ line** — `GPIO` objects model interrupt/signal lines. A peripheral exposes outputs (`public GPIO IRQ { get; }` or a numbered `Connections` bank) and receives inputs via `OnGPIO`. `.repl` `->` syntax wires them.
-- **Monitor** — Renode's command interpreter/REPL. A `.resc` file is just a sequence of Monitor commands fed line-by-line (same parser as typing at the prompt).
-- **CreationDriver** — the engine that turns a parsed `.repl` into live, registered C# objects. (`renode/src/Renode/PlatformDescription/CreationDriver.cs`.)
-- **TypeManager** — process-wide index of all types in the loaded assemblies; resolves a `.repl` type name to a C# `System.Type` and lazily loads it. (`renode-infrastructure/src/Emulator/Main/Utilities/TypeManager.cs`.)
-- **`using`** — overloaded term: in a `.repl` it means *include another `.repl` file*; in the Monitor it means *add a name prefix* (e.g. `using sysbus` lets you write `uart0` instead of `sysbus.uart0`). These are unrelated mechanisms.
+- **Emulation** - the top-level container; holds all machines, the global clock/quantum, shared media (network/UART hubs). Bound in the Monitor as `emulation`.
+- **Machine** - one virtual board. Implements `IMachine`. Creates and names its `sysbus` in its constructor. Bound in the Monitor as `machine`; selected via `mach`.
+- **`sysbus` (system bus)** - the address space onto which peripherals are mapped. An `IBusController`/`SystemBus`. Available in `.repl` as the implicit variable `sysbus` and in the Monitor as the peripheral name `sysbus`.
+- **Peripheral** - any device model implementing `IPeripheral`. Bus-mappable ones implement `IBusPeripheral` + a width interface (`IDoubleWordPeripheral`, …) and usually `IKnownSize`.
+- **Registration / registration point** - *where* a peripheral attaches to its parent. On the bus: an address (`BusPointRegistration`), an address range (`BusRangeRegistration`), or nothing (`NullRegistrationPoint`). Under a non-bus parent (e.g. a GPIO port): a number (`NumberRegistrationPoint<T>`).
+- **GPIO / IRQ line** - `GPIO` objects model interrupt/signal lines. A peripheral exposes outputs (`public GPIO IRQ { get; }` or a numbered `Connections` bank) and receives inputs via `OnGPIO`. `.repl` `->` syntax wires them.
+- **Monitor** - Renode's command interpreter/REPL. A `.resc` file is just a sequence of Monitor commands fed line-by-line (same parser as typing at the prompt).
+- **CreationDriver** - the engine that turns a parsed `.repl` into live, registered C# objects. (`renode/src/Renode/PlatformDescription/CreationDriver.cs`.)
+- **TypeManager** - process-wide index of all types in the loaded assemblies; resolves a `.repl` type name to a C# `System.Type` and lazily loads it. (`renode-infrastructure/src/Emulator/Main/Utilities/TypeManager.cs`.)
+- **`using`** - overloaded term: in a `.repl` it means *include another `.repl` file*; in the Monitor it means *add a name prefix* (e.g. `using sysbus` lets you write `uart0` instead of `sysbus.uart0`). These are unrelated mechanisms.
 
 ## The instantiation pipeline (phase list)
 
@@ -113,15 +113,15 @@ Keep this list handy; the detailed docs map onto it.
 
 The arc of this documentation set has two halves that meet:
 
-- **Consuming** (docs [01](01-repl-format.md)–[04](04-repl-to-csharp-bridge.md)) — how Renode
+- **Consuming** (docs [01](01-repl-format.md)–[04](04-repl-to-csharp-bridge.md)) - how Renode
   *reads* a `.repl`/`.resc` and runs it: the formats, the C# models, and the
   `CreationDriver`/`TypeManager` bridge (the pipeline above).
-- **Generating** (doc [06](06-generating-a-new-board.md)) — the *inverse* problem: producing a
+- **Generating** (doc [06](06-generating-a-new-board.md)) - the *inverse* problem: producing a
   correct `.repl` for a chip Renode doesn't support yet, from primary sources (SVD + reference
   manual + datasheet), and selecting which C# model each peripheral maps to.
 
 These halves are coupled by a feedback loop. The consumption pipeline is *aggressively
-validating* — loading a `.repl` resolves every type, matches every constructor, checks IRQ
+validating* - loading a `.repl` resolves every type, matches every constructor, checks IRQ
 arity, and registers every peripheral, emitting localized errors (`file:line` + a caret + a
 constructor-selection report). So the **generator uses the consumer as its oracle**: generate →
 load in Renode → read the structured errors → fix → repeat, then boot a reference firmware to
@@ -147,4 +147,4 @@ against a real STM32F103 SVD.
   dipping into 01/03/04 as it references them.
 - **Quick lookup either way:** [05](05-cheatsheet.md).
 
-Next: [`01-repl-format.md`](01-repl-format.md) — the `.repl` language in full.
+Next: [`01-repl-format.md`](01-repl-format.md) - the `.repl` language in full.
