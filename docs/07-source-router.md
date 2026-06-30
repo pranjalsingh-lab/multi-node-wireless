@@ -119,6 +119,14 @@ are fallbacks. F4 (RM/DS) and F5 (catalog) come after, from §5 — they apply t
 2. **CMSIS-SVD if the vendor ships one** — yes, RISC-V SVDs exist (SiFive **FE310** uses `ApplySVD @…/FE310.svd.gz`). Don't assume "RISC-V ⇒ no SVD."
 3. **SoC manual** for PLIC source numbers, CLINT base, hart layout.
 4. Declare `PlatformLevelInterruptController` + `CoreLevelInterruptor`; set each CPU's `timeProvider: clint`, `hartId`, `privilegedArchitecture`.
+> ⚠️ **A committed DTS can carry WIP placeholder `interrupts` — cross-check the BSP/SDK `platform.h`.**
+> The router lists the device tree first for F1–F3, but for **F2 (PLIC source numbers)** a vendor's
+> BSP/SDK interrupt-ID header is frequently *more* reliable. On Mindgrove MGS2401 (Shakti C-class) the
+> committed Zephyr DTS had **contradictory placeholder** UART interrupts (`<47>` vs `<&plic0 6>`), while
+> the FreeRTOS BSP `platform.h` carried the authoritative, internally-consistent PLIC table (contiguous
+> 1–58: GPIO 1–32, PWM 33–40, GPTimer 41–44, I2C 45–46, UART 47–49, QSPI 50–53, SPI 54–57, ADC 58).
+> Treat the BSP interrupt-ID header as **co-primary with the DTS** for F2 on vendor RISC-V MCUs, not a
+> mere fallback rung — and reconcile the two before wiring a real model's IRQ.
 
 ### 4.RISCV-SOFT (LiteX / OpenTitan / Murax / microwatt / PULP / VeeR)
 1. **The SoC generator's own output** — there is *no datasheet* because the address map is whatever the build assigned:
@@ -266,7 +274,13 @@ and reconcile. Redundancy is the point.
 
 1. **Every machine-readable description that might exist**, in this order of trust:
    `vendor CMSIS-SVD` · `CMSIS .pack` (→ extract `*.svd`) · `device tree` (Linux `arch/*/boot/dts`, Zephyr `dts/`, U-Boot) · `SoC-generator CSR map` (LiteX `csr.json`) · `SystemRDL` (→ `tools/PeakRDL-repl`) · `vendor BSP/SDK headers` (`*xx.h`, `core-isa.h`, generated `soc.h`).
-2. **Both human docs, in full**: the **Reference Manual / TRM** *and* the **Datasheet** (+ **errata**). Many F4 facts live in only one of them.
+   > ⚠️ **Two SVD traps (verified on Shakti/Mindgrove).** (a) A repo literally named `<vendor>/CMSIS-SVD`
+   > may be a **fork of the SVD *tooling*** (Open-CMSIS-Pack), containing only ARM test-fixture SVDs — not
+   > a device SVD for the part. (b) A third-party SVD (e.g. platformio `platform-shakti`'s `vajra/parashu/
+   > pinaka.svd`) may describe a **different variant of the same core family** — the generic FPGA SoC, with
+   > *different bases* than the productized silicon. Never copy SVD bases without a **datasheet** cross-check;
+   > MGS2401 has **no** real SVD at all, despite both repos existing.
+2. **Both human docs, in full**: the **Reference Manual / TRM** *and* the **Datasheet** (+ **errata**). Many F4 facts live in only one of them. ⚠️ **Grep the PDF *text*, not just repos** — vendor *programming/API-reference* manuals sometimes **embed the device tree** (MGS2401's API Reference PDF contained the `clint`/`plic`/`gpio`/`uart` `.dtsi` nodes with `reg` + `interrupts`), so a PDF can be your machine-readable F1/F2 source.
 3. **Vendor non-SVD register references** (HTML/PDF) for parts that have no SVD: AMD UG1087 (Zynq), Gaisler GRLIB manual (LEON), TI SLAU (MSP430).
 4. **Reference firmware / HAL/SDK source** — the `#define`s and HAL busy-wait patterns reveal addresses and which clock-ready bits firmware spins on (→ doc 06 §6.3 `Tag`s). `ambiq-apollo4.repl` was matched to the SDK's `am_hal_*` source.
 5. **The in-tree converters** (§7) — run them speculatively even if you'll hand-edit the output.
@@ -301,6 +315,7 @@ Renode ships two generators under `renode/tools/` — prefer them for a first dr
 - **New SiFive RISC-V SoC:** scaffold `sifive-fu540.repl` → fetch **DTS** (+ SVD if SiFive ships one) → `PLIC`+`CLINT`, `timeProvider: clint` → load/boot. *(RISCV-HARD)*
 - **New LiteX soft-SoC:** scaffold `litex_vexriscv.repl` → fetch the build's **`csr.json`/generated headers** (or run `dts2repl`/`PeakRDL-repl`) → HDL-named models → §6 loop *is* the spec. *(RISCV-SOFT)*
 - **New LEON/GR part:** scaffold `gr716.repl` → fetch **Gaisler GRLIB manual** → `GaislerMIC` → load/boot. *(SPARC)*
+- **New Shakti C-class vendor MCU (Mindgrove MGS2401, no SVD):** scaffold `sifive-fe310.repl` → fetch the **datasheet memory map** (all bases/sizes) + the **BSP `platform.h`** (authoritative PLIC IRQ table) + the **API-reference PDF's embedded DTS** (CLINT/PLIC wiring: `cpu@[3,7]`/`cpu@[11,9]`, 2 contexts) → core (`RiscV64`+`CoreLevelInterruptor`+`PlatformLevelInterruptController`+RAM) on real models, **every Shakti peripheral `Tag`-ged** (no models exist) → §6 load+step loop. Watch the FPGA-vs-silicon clock/RAM skew ([doc 06 §7](06-generating-a-new-board.md#7-pitfalls--pre-flight-checklist)). *(RISCV-HARD)*
 
 ---
 

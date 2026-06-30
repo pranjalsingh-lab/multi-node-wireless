@@ -384,6 +384,13 @@ renode --console --disable-xwt -e \
   candidate was rejected ([doc 04 §4](04-repl-to-csharp-bridge.md#4-constructor-selection-for-the-peripheral-itself)).
   These messages are precise — they are the ideal thing to feed back to an LLM.
 
+> **No source build / `dotnet` needed for this oracle.** A **portable / nightly** Renode binary runs
+> the load test directly — and even `cpu Step` single-stepping of a hand-loaded program. Verified on the
+> Mindgrove MGS2401 (Shakti C-class) bring-up: against the bundled portable, `mgs2401.repl` loaded clean
+> (CPU/CLINT/PLIC/memories registered, every unmodeled peripheral `Tag`-ged) and the RV64 core executed
+> a two-instruction test (`addi` ×2 → registers and PC advanced correctly). So you can iterate the §6.5
+> loop without building from source.
+
 ### 6.2 Reading the errors (map message → fix)
 | Symptom | Likely cause | Fix |
 |---|---|---|
@@ -443,6 +450,14 @@ makes it a good closed-loop signal for an LLM.
   SVD `P0 = 0x50000000` but the model registers at `0x50000500` (SVD base + 0x500, because the
   port reserves `0x000–0x4FF`) — [§2.1](#21-caveat--the-model-base-can-be-svd-base--register-block-offset).
   STM32 is offset-0, which is why this never bites there.
+- **FPGA-prototype values ≠ silicon values** for a soft-SoC that was later fabricated (Shakti, some
+  SiFive parts). The in-tree DTS is often the **FPGA bring-up board's** tree, so its `clock-frequency`,
+  `timebase-frequency`, and `memory` node describe the prototype, not the chip. Mindgrove MGS2401
+  (Shakti C-class): `c-class.dts` says `timebase-frequency = 10 MHz` and a **256 MB** DDR
+  `memory@80000000`, but the silicon is **700 MHz** with **128 KB** SRAM at that same base. A generator
+  that trusts the DTS mis-sets the CLINT `frequency:` and over-sizes RAM ~2000×. Cross-check clocks,
+  timebase, and memory sizes against the **datasheet**; treat the DTS as authoritative for *addresses
+  and wiring*, not for *clocks and sizes*.
 - **Clock-ready Tags**: firmware often busy-waits on RCC/PLL ready bits the model doesn't set —
   Tag them (the F103 `RCC_CR 0x0A020083` trick).
 - **AF table direction**: F103 wires both `timer -> gpio#pin` and `gpio pin -> timer`; get both.

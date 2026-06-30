@@ -218,6 +218,11 @@ the bug needs no `Send Frame`, only the `Bring Up Network` path, so it reproduce
 a fork build. The nightly's bundled `mr_canhubk3.repl` has `lpi2c0` commented (the
 bug-triggering condition).
 
+> The same bundled **portable/nightly** binary is all you need to validate a *fresh* platform too —
+> it runs the [doc 06 §6.1](06-generating-a-new-board.md#61-static-load-test-fastest-signal) load oracle
+> and `cpu Step` without a source build or `dotnet`. Confirmed here by load-testing and single-stepping a
+> from-scratch `mgs2401.repl` (Shakti C-class) against this exact portable.
+
 | Check | Result |
 |---|---|
 | `machine Reset` survival experiment | sensor stays registered, value → 0 (theory disproven) |
