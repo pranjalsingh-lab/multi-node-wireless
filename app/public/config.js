@@ -6,4 +6,4 @@
 //
 //   window.API_BASE = "https://wireless-device-lab-api.onrender.com";
 //
-window.API_BASE = "";
+window.API_BASE = "https://multi-node-wireless.onrender.com";
