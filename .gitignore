@@ -1,0 +1,12 @@
+# large / downloadable — recreate with ./setup.sh
+vendor/
+firmware/defaults/
+firmware/uploads/
+
+# generated at runtime
+work/
+*.log
+
+# node
+app/node_modules/
+npm-debug.log*

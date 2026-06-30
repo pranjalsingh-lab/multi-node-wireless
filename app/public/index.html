@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Wireless Device Lab</title>
+<style>
+  :root{
+    --bg:#0b0f17; --panel:#121826; --panel2:#0e1420; --line:#1f2a3c;
+    --txt:#e6edf6; --muted:#8aa0bd; --accent:#4f8cff; --good:#39d98a;
+    --warn:#f5a623; --bad:#ff5d6c; --pulse:#ff4d6d;
+    --chip:#1b2436;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#16243f 0%,var(--bg) 55%);
+    color:var(--txt);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif;min-height:100vh}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;
+    padding:18px 28px;border-bottom:1px solid var(--line);position:sticky;top:0;
+    background:rgba(11,15,23,.82);backdrop-filter:blur(8px);z-index:5}
+  .brand{display:flex;align-items:center;gap:12px}
+  .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#4f8cff,#8a5dff);
+    display:grid;place-items:center;box-shadow:0 4px 18px rgba(79,140,255,.4)}
+  .logo svg{width:20px;height:20px}
+  h1{font-size:17px;margin:0;letter-spacing:.2px}
+  .sub{color:var(--muted);font-size:12px;margin-top:1px}
+  .controls{display:flex;align-items:center;gap:14px}
+  .pill{display:flex;align-items:center;gap:8px;background:var(--chip);border:1px solid var(--line);
+    padding:7px 12px;border-radius:999px;font-size:12px;color:var(--muted)}
+  .dot{width:9px;height:9px;border-radius:50%;background:#56627a}
+  .dot.on{background:var(--good);box-shadow:0 0 10px var(--good)}
+  .dot.busy{background:var(--warn);box-shadow:0 0 10px var(--warn);animation:blink 1s infinite}
+  @keyframes blink{50%{opacity:.35}}
+  button{font:inherit;cursor:pointer;border:none;border-radius:9px;padding:10px 18px;font-weight:600;color:#fff}
+  .btn-go{background:linear-gradient(135deg,#34d27b,#19a85f)}
+  .btn-stop{background:linear-gradient(135deg,#ff6b78,#e23d4d)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .wrap{max-width:1280px;margin:0 auto;padding:22px 28px 60px}
+  .linkbar{display:flex;align-items:center;justify-content:center;gap:14px;margin:6px 0 22px;color:var(--muted);font-size:12.5px}
+  .linknode{display:flex;align-items:center;gap:7px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel2)}
+  .linkline{position:relative;width:120px;height:2px;background:var(--line);border-radius:2px;overflow:hidden}
+  .linkline.live{background:linear-gradient(90deg,#1f2a3c,#4f8cff,#1f2a3c)}
+  .linkline.live::after{content:"";position:absolute;top:-3px;left:-30%;width:30%;height:8px;
+    background:radial-gradient(circle,#7fb0ff,transparent 70%);animation:flow 1.1s linear infinite}
+  @keyframes flow{to{left:110%}}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:20px}
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+    border-radius:16px;overflow:hidden;display:flex;flex-direction:column;min-height:430px}
+  .card-h{display:flex;align-items:flex-start;gap:13px;padding:16px 16px 12px}
+  .ico{width:42px;height:42px;border-radius:11px;flex:none;display:grid;place-items:center;background:var(--chip);border:1px solid var(--line)}
+  .ico svg{width:22px;height:22px}
+  .card h3{margin:0;font-size:15px}
+  .role{color:var(--muted);font-size:12px;margin-top:2px}
+  .blurb{color:#6f86a6;font-size:11.5px;margin-top:5px;line-height:1.45}
+  .badge{margin-left:auto;font-size:11px;font-weight:600;padding:5px 10px;border-radius:999px;
+    background:var(--chip);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+  .badge.good{color:var(--good);border-color:#1f6b46}
+  .badge.busy{color:var(--warn);border-color:#6b521f}
+  .heart{color:var(--pulse);display:inline-block}
+  .heart.beat{animation:beat .5s ease}
+  @keyframes beat{0%,100%{transform:scale(1)}30%{transform:scale(1.5)}}
+  .fwrow{display:flex;align-items:center;gap:9px;padding:0 16px 12px;font-size:12px;color:var(--muted)}
+  .fwname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:6px 10px;
+    background:var(--panel2);border:1px solid var(--line);border-radius:8px;font-family:ui-monospace,Menlo,monospace}
+  .fwname .tag{font-size:10px;padding:1px 6px;border-radius:5px;margin-right:6px}
+  .tag.default{background:#1d2740;color:#7fa6ff}
+  .tag.custom{background:#28351d;color:#9bdb6b}
+  .mini{padding:6px 10px;font-size:11.5px;border-radius:8px;background:var(--chip);color:var(--txt);border:1px solid var(--line);font-weight:600}
+  .console{flex:1;margin:0 16px;background:#070b12;border:1px solid var(--line);border-radius:10px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;line-height:1.5;
+    color:#bfe3c6;padding:10px 12px;overflow:auto;white-space:pre-wrap;word-break:break-word;min-height:150px;max-height:230px}
+  .console .sys{color:#5f7596}
+  .sensor{padding:14px 16px 6px;border-top:1px solid var(--line);margin-top:12px}
+  .reading{display:flex;align-items:baseline;gap:8px;margin-bottom:10px}
+  .reading b{font-size:24px;font-variant-numeric:tabular-nums}
+  .axis{display:flex;align-items:center;gap:10px;margin:7px 0}
+  .axis label{width:16px;color:var(--muted);font-weight:600}
+  .axis input[type=range]{flex:1;accent-color:var(--accent)}
+  .axis .val{width:48px;text-align:right;font-family:ui-monospace,monospace;color:var(--txt)}
+  .foot{margin-top:30px;color:#5b6b85;font-size:11.5px;text-align:center}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M5 12a7 7 0 0 1 14 0"/><path d="M2 12a10 10 0 0 1 20 0"/><circle cx="12" cy="12" r="1.6" fill="#fff" stroke="none"/></svg></div>
+    <div>
+      <h1>Wireless Device Lab</h1>
+      <div class="sub">Virtual multi-node Bluetooth LE network &middot; live firmware sandbox</div>
+    </div>
+  </div>
+  <div class="controls">
+    <div class="pill"><span id="statusDot" class="dot"></span><span id="statusText">Idle</span></div>
+    <button id="startBtn" class="btn-go">▶ Start network</button>
+    <button id="stopBtn" class="btn-stop hidden">■ Stop</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="linkbar">
+    <span class="linknode"><span class="dot" id="ln-gateway"></span> Gateway</span>
+    <span class="linkline" id="bleLink"></span>
+    <span style="font-size:11px">Bluetooth LE</span>
+    <span class="linkline" id="bleLink2"></span>
+    <span class="linknode"><span class="dot" id="ln-heartrate"></span> Heart-Rate Band</span>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="foot">Ship two or three simple firmware images, or drop in your own <code>.elf</code> per device. Everything runs on virtual hardware in your browser session.</div>
+</div>
+
+<script>
+const ICONS = {
+  gateway:'<svg viewBox="0 0 24 24" fill="none" stroke="#7fa6ff" stroke-width="1.8"><rect x="3" y="9" width="18" height="11" rx="2"/><path d="M7 9V6a5 5 0 0 1 10 0v3"/><circle cx="12" cy="14.5" r="1.6"/></svg>',
+  heartrate:'<svg viewBox="0 0 24 24" fill="none" stroke="#ff6b88" stroke-width="1.8"><path d="M3 12h4l2-5 3 9 2-6 2 2h5"/></svg>',
+  motion:'<svg viewBox="0 0 24 24" fill="none" stroke="#9bdb6b" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8" /></svg>'
+};
+const MAXLINES = 250;
+let nodes = [];
+const consoles = {};   // id -> {el, lines:[], statusEl}
+let bleState = {gateway:false, heartrate:false};
+
+function el(tag, cls, html){const e=document.createElement(tag); if(cls)e.className=cls; if(html!=null)e.innerHTML=html; return e;}
+
+function buildCard(n){
+  const card = el('div','card');
+  const head = el('div','card-h');
+  head.innerHTML =
+    `<div class="ico">${ICONS[n.id]||''}</div>
+     <div style="flex:1;min-width:0">
+       <h3>${n.label} ${n.id!=='motion'?'<span class="heart" id="heart-'+n.id+'">♥</span>':''}</h3>
+       <div class="role">${n.role}</div>
+       <div class="blurb">${n.blurb}</div>
+     </div>
+     <span class="badge" id="badge-${n.id}">offline</span>`;
+  card.appendChild(head);
+
+  const fw = el('div','fwrow');
+  fw.innerHTML =
+    `<span class="fwname" id="fw-${n.id}"></span>
+     <button class="mini" data-up="${n.id}">Upload .elf</button>
+     <button class="mini" data-reset="${n.id}">Default</button>
+     <input type="file" class="hidden" id="file-${n.id}" accept=".elf,.bin">`;
+  card.appendChild(fw);
+
+  const con = el('div','console');
+  con.id = 'con-'+n.id;
+  card.appendChild(con);
+
+  if(n.sensor){
+    const s = el('div','sensor');
+    s.innerHTML =
+      `<div class="reading">Current reading <b id="read-${n.id}">0.00</b><span style="color:var(--muted)">g (X)</span></div>`+
+      ['X','Y','Z'].map(ax=>
+        `<div class="axis"><label>${ax}</label>
+           <input type="range" min="-10" max="10" step="1" value="0" data-axis="${ax}">
+           <span class="val" id="val-${ax}">0 g</span></div>`).join('');
+    card.appendChild(s);
+  }
+
+  consoles[n.id] = {el:con, lines:[], statusEl:document.getElementById, badge:()=>document.getElementById('badge-'+n.id)};
+  return card;
+}
+
+function setFw(id, firmware){
+  const e = document.getElementById('fw-'+id);
+  if(!e) return;
+  const tag = firmware.source==='custom' ? '<span class="tag custom">custom</span>' : '<span class="tag default">default</span>';
+  e.innerHTML = tag + (firmware.name || '—');
+}
+
+function appendLines(id, lines){
+  const c = consoles[id]; if(!c) return;
+  for(const ln of lines){ c.lines.push(ln); deriveStatus(id, ln); }
+  if(c.lines.length>MAXLINES) c.lines.splice(0,c.lines.length-MAXLINES);
+  const atBottom = c.el.scrollTop+c.el.clientHeight >= c.el.scrollHeight-30;
+  c.el.textContent = c.lines.join('\n');
+  if(atBottom) c.el.scrollTop = c.el.scrollHeight;
+}
+
+function badge(id, text, kind){
+  const b = document.getElementById('badge-'+id); if(!b) return;
+  b.textContent = text; b.className = 'badge'+(kind?(' '+kind):'');
+}
+
+function pulseHeart(id){
+  const h = document.getElementById('heart-'+id); if(!h) return;
+  h.classList.remove('beat'); void h.offsetWidth; h.classList.add('beat');
+}
+
+function deriveStatus(id, line){
+  if(id==='gateway'){
+    if(/Connected:/.test(line)){ badge(id,'connected','good'); bleState.gateway=true; updateLink(); }
+    else if(/\[NOTIFICATION\]/.test(line)){ badge(id,'receiving data','good'); pulseHeart('gateway'); }
+    else if(/Scanning/.test(line)) badge(id,'scanning…','busy');
+    else if(/Booting/.test(line)) badge(id,'booting…','busy');
+  } else if(id==='heartrate'){
+    if(/notifications enabled/i.test(line)){ badge(id,'streaming','good'); }
+    else if(/\bConnected\b/.test(line)){ badge(id,'connected','good'); bleState.heartrate=true; updateLink(); pulseHeart('heartrate'); }
+    else if(/Advertising/.test(line)) badge(id,'advertising…','busy');
+    else if(/Booting/.test(line)) badge(id,'booting…','busy');
+  } else if(id==='motion'){
+    const m = line.match(/(-?\d+\.\d+)\s*g/);
+    if(m){ badge(id,'reading sensor','good'); const r=document.getElementById('read-motion'); if(r) r.textContent=m[1]; }
+    else if(/Booting/.test(line)) badge(id,'booting…','busy');
+  }
+}
+
+function updateLink(){
+  const live = bleState.gateway && bleState.heartrate;
+  document.getElementById('bleLink').classList.toggle('live',live);
+  document.getElementById('bleLink2').classList.toggle('live',live);
+  document.getElementById('ln-gateway').className = 'dot'+(bleState.gateway?' on':'');
+  document.getElementById('ln-heartrate').className = 'dot'+(bleState.heartrate?' on':'');
+}
+
+function setRunning(running, phase){
+  document.getElementById('startBtn').classList.toggle('hidden',running);
+  document.getElementById('stopBtn').classList.toggle('hidden',!running);
+  const dot=document.getElementById('statusDot'), txt=document.getElementById('statusText');
+  if(running){
+    dot.className='dot '+(phase==='starting'?'busy':'on');
+    txt.textContent = phase==='starting' ? 'Starting…' : 'Network live';
+  } else {
+    dot.className='dot'; txt.textContent='Idle';
+    for(const id in consoles) badge(id,'offline','');
+    bleState={gateway:false,heartrate:false}; updateLink();
+  }
+}
+
+function render(){
+  const grid=document.getElementById('grid'); grid.innerHTML='';
+  nodes.forEach(n=>grid.appendChild(buildCard(n)));
+  nodes.forEach(n=>setFw(n.id,n.firmware));
+  wireInputs();
+}
+
+function wireInputs(){
+  document.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>document.getElementById('file-'+b.dataset.up).click());
+  nodes.forEach(n=>{
+    const f=document.getElementById('file-'+n.id);
+    if(f) f.onchange=async()=>{
+      if(!f.files[0]) return;
+      const fd=new FormData(); fd.append('firmware',f.files[0]);
+      const r=await fetch('/api/upload/'+n.id,{method:'POST',body:fd}); const j=await r.json();
+      if(j.ok) setFw(n.id,{source:'custom',name:j.name});
+      f.value='';
+    };
+  });
+  document.querySelectorAll('[data-reset]').forEach(b=>b.onclick=async()=>{
+    await fetch('/api/reset-firmware/'+b.dataset.reset,{method:'POST'});
+  });
+  let t=null;
+  document.querySelectorAll('input[data-axis]').forEach(s=>{
+    s.oninput=()=>{
+      const ax=s.dataset.axis, v=s.value;
+      document.getElementById('val-'+ax).textContent=v+' g';
+      clearTimeout(t);
+      t=setTimeout(()=>fetch('/api/sensor',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({axis:ax,value:Number(v)})}),100);
+    };
+  });
+}
+
+document.getElementById('startBtn').onclick=async()=>{
+  setRunning(true,'starting');
+  for(const id in consoles){consoles[id].lines=[];consoles[id].el.textContent='';}
+  await fetch('/api/start',{method:'POST'});
+};
+document.getElementById('stopBtn').onclick=async()=>{ await fetch('/api/stop',{method:'POST'}); };
+
+// ---- bootstrap + live stream ----
+fetch('/api/state').then(r=>r.json()).then(s=>{ nodes=s.nodes; render(); setRunning(s.running,'running'); connect(); });
+
+function connect(){
+  const es=new EventSource('/api/events');
+  es.onmessage=(e)=>{
+    const m=JSON.parse(e.data);
+    if(m.type==='hello'){
+      if(!nodes.length){nodes=m.nodes;render();}
+      nodes.forEach(n=>{const f=m.nodes.find(x=>x.id===n.id); if(f)setFw(n.id,f.firmware);});
+      setRunning(m.running, 'running');
+      if(m.history) for(const id in m.history) appendLines(id,m.history[id]);
+    } else if(m.type==='line'){ appendLines(m.node,[m.line]); }
+    else if(m.type==='status'){ setRunning(m.running,m.phase); }
+    else if(m.type==='firmware'){ setFw(m.node,m.firmware); }
+    else if(m.type==='sensor'){ const v=document.getElementById('val-'+m.axis); if(v)v.textContent=m.value+' g'; }
+  };
+  es.onerror=()=>{};
+}
+</script>
+</body>
+</html>
