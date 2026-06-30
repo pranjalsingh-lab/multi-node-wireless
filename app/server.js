@@ -344,6 +344,20 @@ function stopEmulation() {
 // HTTP API
 // ----------------------------------------------------------------------------
 const app = express();
+
+// CORS — when the frontend is hosted separately (e.g. on Vercel) it calls this
+// API from a different origin. Allow it, including the SSE stream and uploads.
+// Lock this down by setting CORS_ORIGIN to your frontend URL in production.
+const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', CORS_ORIGIN);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 app.use(express.json());
 app.use(express.static(path.join(APP_DIR, 'public')));
 

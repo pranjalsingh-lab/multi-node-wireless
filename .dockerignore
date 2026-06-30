@@ -1,0 +1,9 @@
+.git
+docs
+work
+vendor
+**/*.log
+app/node_modules
+app/.claude
+firmware/defaults
+firmware/uploads

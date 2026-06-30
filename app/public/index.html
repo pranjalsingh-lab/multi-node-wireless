@@ -114,7 +114,11 @@
   <div class="foot">Ship two or three simple firmware images, or drop in your own <code>.elf</code> per device. Everything runs on virtual hardware in your browser session.</div>
 </div>
 
+<script src="config.js"></script>
 <script>
+// Backend base URL. Empty = same origin (local dev, backend serves this page).
+// In production (frontend on Vercel) config.js sets window.API_BASE.
+const API = (window.API_BASE || '').replace(/\/+$/, '');
 const ICONS = {
   gateway:'<svg viewBox="0 0 24 24" fill="none" stroke="#7fa6ff" stroke-width="1.8"><rect x="3" y="9" width="18" height="11" rx="2"/><path d="M7 9V6a5 5 0 0 1 10 0v3"/><circle cx="12" cy="14.5" r="1.6"/></svg>',
   heartrate:'<svg viewBox="0 0 24 24" fill="none" stroke="#ff6b88" stroke-width="1.8"><path d="M3 12h4l2-5 3 9 2-6 2 2h5"/></svg>',
@@ -247,13 +251,13 @@ function wireInputs(){
     if(f) f.onchange=async()=>{
       if(!f.files[0]) return;
       const fd=new FormData(); fd.append('firmware',f.files[0]);
-      const r=await fetch('/api/upload/'+n.id,{method:'POST',body:fd}); const j=await r.json();
+      const r=await fetch(API+'/api/upload/'+n.id,{method:'POST',body:fd}); const j=await r.json();
       if(j.ok) setFw(n.id,{source:'custom',name:j.name});
       f.value='';
     };
   });
   document.querySelectorAll('[data-reset]').forEach(b=>b.onclick=async()=>{
-    await fetch('/api/reset-firmware/'+b.dataset.reset,{method:'POST'});
+    await fetch(API+'/api/reset-firmware/'+b.dataset.reset,{method:'POST'});
   });
   let t=null;
   document.querySelectorAll('input[data-axis]').forEach(s=>{
@@ -261,7 +265,7 @@ function wireInputs(){
       const ax=s.dataset.axis, v=s.value;
       document.getElementById('val-'+ax).textContent=v+' g';
       clearTimeout(t);
-      t=setTimeout(()=>fetch('/api/sensor',{method:'POST',headers:{'Content-Type':'application/json'},
+      t=setTimeout(()=>fetch(API+'/api/sensor',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({axis:ax,value:Number(v)})}),100);
     };
   });
@@ -277,16 +281,16 @@ document.getElementById('startBtn').onclick=async()=>{
   clearError();
   setRunning(true,'starting');
   for(const id in consoles){consoles[id].lines=[];consoles[id].el.textContent='';}
-  const r=await fetch('/api/start',{method:'POST'});
+  const r=await fetch(API+'/api/start',{method:'POST'});
   if(!r.ok){ const j=await r.json().catch(()=>({})); setRunning(false,'stopped'); showError(j.error||'Could not start the network.'); }
 };
-document.getElementById('stopBtn').onclick=async()=>{ clearError(); await fetch('/api/stop',{method:'POST'}); };
+document.getElementById('stopBtn').onclick=async()=>{ clearError(); await fetch(API+'/api/stop',{method:'POST'}); };
 
 // ---- bootstrap + live stream ----
-fetch('/api/state').then(r=>r.json()).then(s=>{ nodes=s.nodes; render(); setRunning(s.running,'running'); connect(); });
+fetch(API+'/api/state').then(r=>r.json()).then(s=>{ nodes=s.nodes; render(); setRunning(s.running,'running'); connect(); });
 
 function connect(){
-  const es=new EventSource('/api/events');
+  const es=new EventSource(API+'/api/events');
   es.onmessage=(e)=>{
     const m=JSON.parse(e.data);
     if(m.type==='hello'){

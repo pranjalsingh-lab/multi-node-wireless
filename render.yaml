@@ -1,0 +1,19 @@
+# Render blueprint for the backend (Node/Express + Renode).
+# In Render: New > Blueprint, point it at this repo. Render builds the Dockerfile.
+#
+# The simulation is CPU-heavy (3 emulated nRF52840s + a BLE link). The free
+# plan (0.1 CPU / 512 MB) runs but is slow and may be tight on memory; bump to
+# 'starter' for a smooth demo. Render injects $PORT automatically.
+services:
+  - type: web
+    name: wireless-device-lab-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /api/state
+    envVars:
+      - key: CORS_ORIGIN
+        # Set to your Vercel URL once you have it, e.g.
+        #   https://wireless-device-lab.vercel.app
+        # "*" works to start but allows any origin.
+        value: "*"
