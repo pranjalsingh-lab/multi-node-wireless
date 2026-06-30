@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Multi-Node Simulation</title>
+<title>Nanoleaf · Connected Lighting Simulation</title>
 <style>
   :root{
     --bg:#eceef0; --panel:#ffffff; --line:#dfe2e6; --line2:#e8eaed;
@@ -50,9 +50,15 @@
     background:var(--chip);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
   .badge.good{color:var(--green-dk);border-color:var(--green-line);background:var(--green-bg)}
   .badge.busy{color:var(--muted);border-color:var(--line);background:var(--chip)}
-  .heart{color:var(--green);display:inline-block}
-  .heart.beat{animation:beat .5s ease}
-  @keyframes beat{0%,100%{transform:scale(1)}30%{transform:scale(1.5)}}
+  .logo{width:26px;height:26px;flex:none;border-radius:7px;position:relative;
+    background:linear-gradient(135deg,var(--green),var(--green-dk))}
+  .logo::after{content:"";position:absolute;inset:0;margin:auto;width:0;height:0;
+    border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid #fff}
+  .bulb{color:var(--green);display:inline-flex;vertical-align:-2px}
+  .bulb svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8}
+  .bulb.glow{animation:glow .6s ease}
+  .bulb.glow svg{fill:var(--green-bg);filter:drop-shadow(0 0 5px var(--green))}
+  @keyframes glow{0%,100%{transform:scale(1)}35%{transform:scale(1.35)}}
   .fwrow{display:flex;align-items:center;gap:9px;padding:0 16px 12px;font-size:12px;color:var(--muted)}
   .fwname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:6px 10px;
     background:var(--chip);border:1px solid var(--line);border-radius:7px;font-family:ui-monospace,Menlo,monospace}
@@ -146,9 +152,10 @@
 <body>
 <header>
   <div class="brand">
+    <span class="logo" aria-hidden="true"></span>
     <div>
-      <h1>Multi-Node Simulation</h1>
-      <div class="sub">Three emulated Nordic nRF52840 nodes &middot; virtual Bluetooth LE network &middot; live firmware sandbox</div>
+      <h1>Nanoleaf &middot; Connected Lighting</h1>
+      <div class="sub">Three emulated Nordic nRF52840 boards &middot; virtual Bluetooth LE link &middot; live firmware sandbox</div>
     </div>
   </div>
   <div class="controls">
@@ -168,27 +175,27 @@
     <div class="ex-body">
       <p class="ex-lead">
         This lab boots <span class="k">three virtual Nordic nRF52840 boards</span> and runs real firmware on
-        emulated hardware - there is no physical device anywhere. Two of the boards talk to each other over a
-        <span class="k">virtual Bluetooth LE radio</span>; the third reads a simulated accelerometer over SPI.
-        Each card shows that node's live serial console, exactly what the firmware prints.
+        emulated hardware - there are no physical fixtures anywhere. A lighting hub talks to a smart bulb over a
+        <span class="k">virtual Bluetooth LE link</span>; a third board watches a fixture's accelerometer for tilt
+        or tampering. Each card shows that node's live serial console, exactly what the firmware prints.
       </p>
       <div class="ex-grid">
         <div class="ex">
           <h4>The three nodes</h4>
           <ul>
-            <li><b>Gateway</b> - BLE central. Scans the air, connects to the band, and collects its readings.</li>
-            <li><b>Heart-Rate Band</b> - BLE peripheral. Advertises a heart-rate service and streams beats per minute.</li>
-            <li><b>Motion Sensor Node</b> - reads an ADXL372 accelerometer over SPI. No radio.</li>
+            <li><b>Lighting Hub</b> - BLE central. Scans the air, connects to the bulb, and collects its live readings.</li>
+            <li><b>Smart Bulb</b> - BLE peripheral. Advertises a lighting service and streams its color temperature.</li>
+            <li><b>Tilt &amp; Tamper Sensor</b> - reads a 3-axis accelerometer over SPI to catch a knocked or tilted fixture. No radio.</li>
           </ul>
         </div>
         <div class="ex">
           <h4>When you press Start</h4>
           <ol>
             <li>All three boards power on and boot their firmware.</li>
-            <li>The band starts <b>advertising</b>; the gateway starts <b>scanning</b>.</li>
+            <li>The bulb starts <b>advertising</b>; the hub starts <b>scanning</b>.</li>
             <li>They find each other and <b>connect</b> over Bluetooth LE.</li>
-            <li>The gateway subscribes and <b>heart-rate notifications</b> begin flowing.</li>
-            <li>The motion node reads its sensor on a loop.</li>
+            <li>The hub subscribes and <b>color-temperature updates</b> begin flowing.</li>
+            <li>The tilt sensor reads its accelerometer on a loop.</li>
           </ol>
           <p style="margin-top:7px">Expect this to settle within a few seconds.</p>
         </div>
@@ -204,7 +211,7 @@
         <div class="ex">
           <h4>Things to try</h4>
           <ul>
-            <li>Drag the motion node's <b>X / Y / Z</b> sliders - the reading the firmware sees changes live.</li>
+            <li>Drag the sensor's <b>X / Y / Z</b> sliders - the orientation the firmware sees changes live, as if the fixture were tilted.</li>
             <li>Hit <b>View code</b> to read the exact firmware source and how it communicates.</li>
             <li>Compile your own image and <b>Upload .elf</b> to run it; <b>Default</b> reverts.</li>
           </ul>
@@ -250,9 +257,11 @@
 const API = (window.API_BASE || '').replace(/\/+$/, '');
 const ICONS = {
   gateway:'<svg viewBox="0 0 24 24" fill="none" stroke="#3f8268" stroke-width="1.8"><rect x="3" y="9" width="18" height="11" rx="2"/><path d="M7 9V6a5 5 0 0 1 10 0v3"/><circle cx="12" cy="14.5" r="1.6"/></svg>',
-  heartrate:'<svg viewBox="0 0 24 24" fill="none" stroke="#3f8268" stroke-width="1.8"><path d="M3 12h4l2-5 3 9 2-6 2 2h5"/></svg>',
-  motion:'<svg viewBox="0 0 24 24" fill="none" stroke="#3f8268" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8" /></svg>'
+  heartrate:'<svg viewBox="0 0 24 24" fill="none" stroke="#3f8268" stroke-width="1.8"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.55.42.9 1.06.96 1.75l.04.45h5.2l.04-.45c.06-.69.41-1.33.96-1.75A6 6 0 0 0 12 3z"/></svg>',
+  motion:'<svg viewBox="0 0 24 24" fill="none" stroke="#3f8268" stroke-width="1.8"><rect x="5" y="5" width="14" height="14" rx="3" transform="rotate(10 12 12)"/><path d="M12 9.4v3.3M12 15.6h.01"/></svg>'
 };
+// Small glowing bulb shown beside the radio nodes; pulses when data flows.
+const BULB = '<svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.55.42.9 1.06.96 1.75l.04.45h5.2l.04-.45c.06-.69.41-1.33.96-1.75A6 6 0 0 0 12 3z"/></svg>';
 const MAXLINES = 250;
 let nodes = [];
 const consoles = {};   // id -> {el, lines:[{t,k}], seen:Set}
@@ -266,7 +275,7 @@ function buildCard(n){
   head.innerHTML =
     `<div class="ico">${ICONS[n.id]||''}</div>
      <div style="flex:1;min-width:0">
-       <h3>${n.label} ${n.id!=='motion'?'<span class="heart" id="heart-'+n.id+'">♥</span>':''}</h3>
+       <h3>${n.label} ${n.id!=='motion'?'<span class="bulb" id="bulb-'+n.id+'">'+BULB+'</span>':''}</h3>
        <div class="role">${n.role}</div>
        <div class="blurb">${n.blurb}</div>
      </div>
@@ -289,7 +298,7 @@ function buildCard(n){
   if(n.sensor){
     const s = el('div','sensor');
     s.innerHTML =
-      `<div class="reading">Current reading <b id="read-${n.id}">0.00</b><span style="color:var(--muted)">g (X)</span></div>`+
+      `<div class="reading">Orientation <b id="read-${n.id}">0.00</b><span style="color:var(--muted)">g (X-axis)</span></div>`+
       ['X','Y','Z'].map(ax=>
         `<div class="axis"><label>${ax}</label>
            <input type="range" min="-10" max="10" step="1" value="0" data-axis="${ax}">
@@ -338,9 +347,9 @@ function badge(id, text, kind){
   b.textContent = text; b.className = 'badge'+(kind?(' '+kind):'');
 }
 
-function pulseHeart(id){
-  const h = document.getElementById('heart-'+id); if(!h) return;
-  h.classList.remove('beat'); void h.offsetWidth; h.classList.add('beat');
+function pulseBulb(id){
+  const h = document.getElementById('bulb-'+id); if(!h) return;
+  h.classList.remove('glow'); void h.offsetWidth; h.classList.add('glow');
 }
 
 // Updates the badge AND returns an explicit, human-readable event string the
@@ -348,22 +357,22 @@ function pulseHeart(id){
 // "this happened, then this happened").
 function deriveStatus(id, line){
   if(id==='gateway'){
-    if(/Booting/.test(line)){ badge(id,'booting…','busy'); return sysOnce(id,'boot','Gateway powered on - booting firmware'); }
-    if(/Scanning/.test(line)){ badge(id,'scanning…','busy'); return sysOnce(id,'scan','Scanning radio for advertising devices…'); }
-    if(/Connected:/.test(line)){ badge(id,'connected','good'); return sysOnce(id,'conn','Connected to Heart-Rate Band over Bluetooth LE'); }
-    if(/\[NOTIFICATION\]/.test(line)){ badge(id,'receiving data','good'); pulseHeart('gateway'); return sysOnce(id,'notif','Subscribed - receiving live heart-rate notifications'); }
+    if(/Booting/.test(line)){ badge(id,'booting…','busy'); return sysOnce(id,'boot','Lighting hub powered on - booting firmware'); }
+    if(/Scanning/.test(line)){ badge(id,'scanning…','busy'); return sysOnce(id,'scan','Scanning for nearby lighting fixtures…'); }
+    if(/Connected:/.test(line)){ badge(id,'connected','good'); return sysOnce(id,'conn','Connected to Smart Bulb over Bluetooth LE'); }
+    if(/\[NOTIFICATION\]/.test(line)){ badge(id,'receiving data','good'); pulseBulb('gateway'); return sysOnce(id,'notif','Subscribed - receiving live color-temperature updates'); }
   } else if(id==='heartrate'){
-    if(/Booting/.test(line)){ badge(id,'booting…','busy'); return sysOnce(id,'boot','Heart-Rate Band powered on - booting firmware'); }
-    if(/Advertising/.test(line)){ badge(id,'advertising…','busy'); return sysOnce(id,'adv','Advertising heart-rate service, waiting for a central…'); }
-    if(/\bConnected\b/.test(line)){ badge(id,'connected','good'); pulseHeart('heartrate'); return sysOnce(id,'conn','Central connected - link established'); }
-    if(/notification.*enabled/i.test(line)){ badge(id,'streaming','good'); return sysOnce(id,'stream','Notifications enabled - streaming beats per minute'); }
+    if(/Booting/.test(line)){ badge(id,'booting…','busy'); return sysOnce(id,'boot','Smart bulb powered on - booting firmware'); }
+    if(/Advertising/.test(line)){ badge(id,'advertising…','busy'); return sysOnce(id,'adv','Advertising lighting service, waiting for the hub…'); }
+    if(/\bConnected\b/.test(line)){ badge(id,'connected','good'); pulseBulb('heartrate'); return sysOnce(id,'conn','Hub connected - link established'); }
+    if(/notification.*enabled/i.test(line)){ badge(id,'streaming','good'); return sysOnce(id,'stream','Notifications enabled - streaming color temperature'); }
   } else if(id==='motion'){
-    if(/Booting/.test(line)){ badge(id,'booting…','busy'); return sysOnce(id,'boot','Motion node powered on - booting firmware'); }
+    if(/Booting/.test(line)){ badge(id,'booting…','busy'); return sysOnce(id,'boot','Tilt sensor powered on - booting firmware'); }
     const m = line.match(/(-?\d+\.\d+)\s*g/);
     if(m){
-      badge(id,'reading sensor','good');
+      badge(id,'monitoring tilt','good');
       const r=document.getElementById('read-motion'); if(r) r.textContent=m[1];
-      return sysOnce(id,'read','Reading ADXL372 accelerometer over SPI');
+      return sysOnce(id,'read','Reading accelerometer over SPI - watching for tilt & tamper');
     }
   }
   return null;
