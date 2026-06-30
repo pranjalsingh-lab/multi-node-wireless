@@ -34,14 +34,17 @@ FROM antmicro/renode:latest
 # The base image sets an ENTRYPOINT (renode). Clear it so our CMD runs as-is.
 ENTRYPOINT []
 
-# Bring in the Node.js runtime + npm from the build stage — no apt needed here.
+# The base image runs as a non-root user, but the app writes to /srv at runtime
+# (work/, run.resc, renode.log, uploaded firmware). Run as root so those — and
+# the COPY'd files below — are writable.
+USER root
+
+# Bring in just the Node.js runtime from the build stage — npm isn't needed at
+# runtime (deps were already installed there). node is a single binary on PATH.
 # (node from bullseye/glibc 2.31 runs on the Renode base; if you ever hit a
 # "GLIBC_… not found" error, the base is older than expected — tell me and I'll
 # switch to fetching the standalone Node tarball instead.)
 COPY --from=build /usr/local/bin/node /usr/local/bin/node
-COPY --from=build /usr/local/lib/node_modules /usr/local/lib/node_modules
-RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
- && ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
 WORKDIR /srv
 
