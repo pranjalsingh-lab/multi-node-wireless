@@ -266,14 +266,29 @@ async function startEmulation() {
   fs.writeFileSync(RESC_PATH, buildResc());
   const logFd = fs.openSync(RENODE_LOG, 'w');
 
-  const child = spawn(RENODE_BIN, ['--disable-xwt', '-P', String(MONITOR_PORT), RESC_PATH], {
-    cwd: RENODE_DIR,
-    detached: true,
-    stdio: ['ignore', logFd, logFd],
-  });
+  const startedAt = Date.now();
+  let child;
+  try {
+    child = spawn(RENODE_BIN, ['--disable-xwt', '-P', String(MONITOR_PORT), RESC_PATH], {
+      cwd: RENODE_DIR,
+      detached: true,
+      stdio: ['ignore', logFd, logFd],
+    });
+  } catch (e) {
+    sse('status', { running: false, phase: 'error', error: `Could not launch the engine: ${e.message}` });
+    return;
+  }
   state.child = child;
   state.running = true;
   sse('status', { running: true, phase: 'starting' });
+
+  // spawn() can fail asynchronously (e.g. ENOENT) — without this the process crashes.
+  child.on('error', (e) => {
+    if (state.child !== child) return;
+    state.child = null;
+    state.running = false;
+    sse('status', { running: false, phase: 'error', error: `Could not launch the engine at ${RENODE_BIN}: ${e.code || e.message}` });
+  });
 
   child.on('exit', (code) => {
     if (state.child === child) {
@@ -284,7 +299,15 @@ async function startEmulation() {
       }
       state.uartSockets = {};
       if (state.monitorSocket) { try { state.monitorSocket.destroy(); } catch (_) {} state.monitorSocket = null; }
-      sse('status', { running: false, phase: 'stopped' });
+      // If it died almost immediately, the run never really started — surface why.
+      if (Date.now() - startedAt < 9000) {
+        let tail = '';
+        try { tail = fs.readFileSync(RENODE_LOG, 'utf8').replace(ANSI, '').trim().split('\n').slice(-12).join('\n'); } catch (_) {}
+        sse('status', { running: false, phase: 'error',
+          error: `The engine exited immediately (code ${code}). Last output:\n${tail || '(no output captured)'}` });
+      } else {
+        sse('status', { running: false, phase: 'stopped' });
+      }
     }
   });
 
