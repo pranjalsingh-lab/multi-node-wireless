@@ -10,10 +10,33 @@ const { spawn, execFile } = require('child_process');
 // ----------------------------------------------------------------------------
 // Paths & configuration
 // ----------------------------------------------------------------------------
+const os = require('os');
+const { execFileSync } = require('child_process');
+
 const APP_DIR = __dirname;
 const ROOT = path.resolve(APP_DIR, '..');
-const RENODE_DIR = path.join(ROOT, 'vendor', 'renode');
-const RENODE_BIN = path.join(RENODE_DIR, 'renode');
+
+// Locate the Renode launcher. Priority: explicit env var, a sibling/home source
+// build, the bundled portable, then whatever is on PATH. Set RENODE_PATH to your
+// build's `renode` launcher script to skip the download entirely.
+function resolveRenode() {
+  const explicit = process.env.RENODE_PATH;
+  if (explicit) return path.resolve(explicit);
+  const candidates = [
+    path.join(ROOT, '..', 'renode', 'renode'),       // sibling clone: ../renode/renode
+    path.join(os.homedir(), 'renode', 'renode'),     // ~/renode/renode
+    path.join(ROOT, 'vendor', 'renode', 'renode'),   // bundled portable
+  ];
+  for (const c of candidates) { try { if (fs.existsSync(c)) return c; } catch (_) {} }
+  try {
+    const which = process.platform === 'win32' ? 'where' : 'which';
+    const p = execFileSync(which, ['renode'], { encoding: 'utf8' }).split('\n')[0].trim();
+    if (p) return p;
+  } catch (_) {}
+  return path.join(ROOT, 'vendor', 'renode', 'renode'); // default (may not exist)
+}
+const RENODE_BIN = resolveRenode();
+const RENODE_DIR = path.dirname(RENODE_BIN);
 const DEFAULT_FW_DIR = path.join(ROOT, 'firmware', 'defaults');
 const UPLOAD_FW_DIR = path.join(ROOT, 'firmware', 'uploads');
 const WORK_DIR = path.join(ROOT, 'work');
@@ -206,12 +229,34 @@ function monitorCmd(cmd) {
 
 function killStray() {
   return new Promise((resolve) => {
-    // Targeted: only our bundled renode, never the node server.
-    execFile('pkill', ['-9', '-f', 'multi-node-wireless/vendor/renode'], () => resolve());
+    // Targeted: only a process launched with OUR run script, never the user's
+    // other Renode sessions or the node server.
+    execFile('pkill', ['-9', '-f', RESC_PATH], () => resolve());
   });
 }
 
+function preflight() {
+  const problems = [];
+  if (!fs.existsSync(RENODE_BIN)) {
+    problems.push(`Simulation engine not found at "${RENODE_BIN}". Set RENODE_PATH to your renode launcher.`);
+  }
+  for (const n of NODES) {
+    const fw = firmwareFor(n);
+    if (!fs.existsSync(fw.path)) {
+      problems.push(`Missing firmware for "${n.label}" (${fw.path}). Upload one in the UI or run ./setup.sh.`);
+    }
+  }
+  return problems;
+}
+
 async function startEmulation() {
+  const problems = preflight();
+  if (problems.length) {
+    sse('status', { running: false, phase: 'error', error: problems.join('  ') });
+    const err = new Error(problems.join(' | '));
+    err.userMessage = problems.join('  ');
+    throw err;
+  }
   if (state.running) await stopEmulation();
   await killStray();
   await new Promise((r) => setTimeout(r, 400));
@@ -306,7 +351,7 @@ app.get('/api/events', (req, res) => {
 
 app.post('/api/start', async (req, res) => {
   try { await startEmulation(); res.json({ ok: true }); }
-  catch (e) { res.status(500).json({ ok: false, error: 'failed to start' }); }
+  catch (e) { res.status(500).json({ ok: false, error: e.userMessage || 'failed to start' }); }
 });
 
 app.post('/api/stop', async (req, res) => {
@@ -349,4 +394,5 @@ process.on('SIGTERM', async () => { await stopEmulation(); process.exit(0); });
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`Wireless Device Lab running:  http://localhost:${PORT}`);
+  console.log(`Simulation engine:           ${RENODE_BIN}${fs.existsSync(RENODE_BIN) ? '' : '   <-- NOT FOUND (set RENODE_PATH)'}`);
 });

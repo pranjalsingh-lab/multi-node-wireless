@@ -77,6 +77,8 @@
   .axis input[type=range]{flex:1;accent-color:var(--accent)}
   .axis .val{width:48px;text-align:right;font-family:ui-monospace,monospace;color:var(--txt)}
   .foot{margin-top:30px;color:#5b6b85;font-size:11.5px;text-align:center}
+  .errbar{margin:0 0 18px;padding:11px 14px;border-radius:10px;background:#2a151a;
+    border:1px solid #6b2530;color:#ffb3bd;font-size:12.5px;line-height:1.5}
   .hidden{display:none}
 </style>
 </head>
@@ -97,6 +99,7 @@
 </header>
 
 <div class="wrap">
+  <div id="errbar" class="errbar hidden"></div>
   <div class="linkbar">
     <span class="linknode"><span class="dot" id="ln-gateway"></span> Gateway</span>
     <span class="linkline" id="bleLink"></span>
@@ -263,12 +266,20 @@ function wireInputs(){
   });
 }
 
+function showError(msg){
+  const b=document.getElementById('errbar');
+  b.textContent=msg; b.classList.remove('hidden');
+}
+function clearError(){ document.getElementById('errbar').classList.add('hidden'); }
+
 document.getElementById('startBtn').onclick=async()=>{
+  clearError();
   setRunning(true,'starting');
   for(const id in consoles){consoles[id].lines=[];consoles[id].el.textContent='';}
-  await fetch('/api/start',{method:'POST'});
+  const r=await fetch('/api/start',{method:'POST'});
+  if(!r.ok){ const j=await r.json().catch(()=>({})); setRunning(false,'stopped'); showError(j.error||'Could not start the network.'); }
 };
-document.getElementById('stopBtn').onclick=async()=>{ await fetch('/api/stop',{method:'POST'}); };
+document.getElementById('stopBtn').onclick=async()=>{ clearError(); await fetch('/api/stop',{method:'POST'}); };
 
 // ---- bootstrap + live stream ----
 fetch('/api/state').then(r=>r.json()).then(s=>{ nodes=s.nodes; render(); setRunning(s.running,'running'); connect(); });
@@ -283,7 +294,7 @@ function connect(){
       setRunning(m.running, 'running');
       if(m.history) for(const id in m.history) appendLines(id,m.history[id]);
     } else if(m.type==='line'){ appendLines(m.node,[m.line]); }
-    else if(m.type==='status'){ setRunning(m.running,m.phase); }
+    else if(m.type==='status'){ if(m.phase==='error'){ setRunning(false,'stopped'); showError(m.error||'Could not start.'); } else setRunning(m.running,m.phase); }
     else if(m.type==='firmware'){ setFw(m.node,m.firmware); }
     else if(m.type==='sensor'){ const v=document.getElementById('val-'+m.axis); if(v)v.textContent=m.value+' g'; }
   };
