@@ -24,12 +24,14 @@ COPY app ./app
 # Reference firmware sources shown read-only in the UI (the "View code" panel).
 COPY firmware/src ./firmware/src
 
-# Default firmware images - the same files setup.sh fetches.
-RUN mkdir -p firmware/defaults firmware/uploads \
- && DL="https://dl.antmicro.com/projects/renode" \
- && curl -L --retry 3 "$DL/nrf52840--zephyr-bluetooth_central_hr.elf-s_3380332-316e27f81dcda3c2b0e7f2c3516001e7b27ad051"   -o firmware/defaults/gateway.elf \
- && curl -L --retry 3 "$DL/nrf52840--zephyr-bluetooth_peripheral_hr.elf-s_3217940-7b59adc9629f8be90067b131e663a13d2d4bb711" -o firmware/defaults/heartrate.elf \
- && curl -L --retry 3 "$DL/nrf52840--zephyr_adxl372_spi.elf-s_993780-1dedb945dae92c07f1b4d955719bfb1f1e604173"            -o firmware/defaults/motion.elf
+# Default firmware images. This repo ships its OWN custom firmware - the
+# tilt -> hub -> bulb BLE beacon relay (see docs/13) - committed under
+# firmware/defaults/. Bake those committed ELFs into the image. Do NOT
+# re-download the upstream stock heart-rate/adxl samples: those are the old demo
+# and would make the hosted app print [NOTIFICATION]/HRS/"3.00 g" instead of the
+# tilt->brightness pipeline.
+COPY firmware/defaults ./firmware/defaults
+RUN mkdir -p firmware/uploads
 
 # ---- runtime stage: Renode engine + the Node runtime copied in ---------------
 FROM antmicro/renode:latest

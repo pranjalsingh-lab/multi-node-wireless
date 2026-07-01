@@ -152,6 +152,41 @@
   .build-body .note{color:var(--green-dk);background:var(--green-bg);border:1px solid var(--green-line);
     border-radius:8px;padding:9px 12px;margin-top:10px}
   .build-body a{color:var(--green-dk);font-weight:600}
+  /* ---- live data-flow pipeline: who reads what, and the intensity ---- */
+  .flow{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;margin:0 0 18px}
+  .flow-stage{flex:1 1 240px;min-width:225px;display:flex;gap:12px;align-items:flex-start;
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px 16px;
+    transition:border-color .25s,box-shadow .25s,transform .12s}
+  .flow-stage.active{border-color:var(--green-line);box-shadow:0 0 0 3px var(--green-bg)}
+  .flow-stage.pulse{transform:translateY(-2px)}
+  .fs-ico{width:38px;height:38px;border-radius:10px;flex:none;display:grid;place-items:center;
+    background:var(--chip);border:1px solid var(--line);transition:filter .25s}
+  .fs-ico svg{width:20px;height:20px}
+  .fs-body{min-width:0;flex:1}
+  .fs-step{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--faint)}
+  .fs-title{font-size:14.5px;font-weight:680;margin:1px 0}
+  .fs-sub{font-size:11.5px;color:var(--muted);line-height:1.4}
+  .fs-val{margin-top:7px;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--txt);
+    background:var(--chip);border:1px solid var(--line);border-radius:7px;padding:4px 8px;
+    display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .flow-arrow{flex:0 0 auto;align-self:center;display:flex;flex-direction:column;align-items:center;
+    gap:1px;min-width:62px}
+  .flow-arrow .lbl{font-size:10px;font-weight:600;color:var(--muted);white-space:nowrap}
+  .flow-arrow .arw{font-size:22px;line-height:1;color:var(--line);transition:color .25s,transform .25s}
+  .flow-arrow .sub{font-size:9px;color:var(--faint);white-space:nowrap}
+  .flow-arrow.active .arw{color:var(--green);transform:scale(1.25)}
+  .flow-bulb{flex:1 1 290px}
+  .intensity{margin-top:6px;line-height:1}
+  .intensity .big{font-size:30px;font-weight:720;font-variant-numeric:tabular-nums;
+    color:var(--faint);transition:color .25s}
+  .flow-bulb.active .intensity .big{color:var(--green-dk)}
+  .intensity .unit{font-size:15px;font-weight:600;color:var(--muted);margin-left:1px}
+  .meter{margin-top:8px;height:9px;border-radius:6px;background:var(--chip);
+    border:1px solid var(--line);overflow:hidden}
+  .meter-fill{height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--green-dk));
+    transition:width .35s ease}
+  .tamper{margin-top:7px;font-size:10.5px;font-weight:700;color:#b45309;display:none}
+  .tamper.on{display:block}
 </style>
 </head>
 <body>
@@ -175,13 +210,17 @@
 
   <section class="hero">
     <h2>What's happening here</h2>
-    <p>This lab boots <b>three virtual Nordic nRF52840 boards</b> and runs real firmware on emulated
-       hardware - there are no physical fixtures anywhere. Press <b>Start</b> and the <b>Smart Bulb</b>
-       advertises a lighting service, the <b>Lighting Hub</b> finds it and connects over a
-       <b>virtual Bluetooth LE link</b>, and live color-temperature readings begin flowing. A third board
-       watches a fixture's accelerometer for tilt or tampering. Each card below is one board's live serial
-       console - read it to see exactly what that firmware is doing.</p>
+    <p>This lab boots <b>three virtual Nordic nRF52840 boards</b> running real firmware on emulated
+       hardware - there are no physical fixtures anywhere. They form a one-way pipeline over a
+       <b>virtual Bluetooth LE link</b>: the <b>Tilt Sensor</b> reads its accelerometer over SPI and
+       broadcasts the fixture's orientation; the <b>Lighting Hub</b> hears that, turns the tilt into a
+       <b>brightness</b>, and broadcasts <i>that</i>; the <b>Smart Bulb</b> hears the brightness and
+       lights up to match. Press <b>Start</b>, drag the sensor's sliders, and watch the intensity below
+       follow. Each card further down is one board's live serial console.</p>
   </section>
+
+  <!-- live pipeline: who reads what, ending in the bulb's intensity -->
+  <section class="flow" id="flow"></section>
 
   <div class="grid" id="grid"></div>
 
@@ -189,17 +228,18 @@
     <h2>How to read &amp; tweak it</h2>
     <div class="ex-grid">
       <div class="ex">
-        <h4>What you're seeing</h4>
-        <p>Each dark box is the raw serial output of one board. The green
-           <span class="k">&rsaquo; lines</span> are plain-language milestones we add on top
-           (&ldquo;connected&rdquo;, &ldquo;streaming&hellip;&rdquo;) so you can follow along without parsing
-           every line. The badge at the top-right of each card tracks that node's current state.</p>
+        <h4>Who reads what</h4>
+        <p>The pipeline runs one way. The <b>Tilt Sensor</b> reads the ADXL372 over <b>SPI</b> and
+           advertises the raw X/Y/Z. The <b>Lighting Hub</b> is the only board that listens to the
+           sensor - it maps the horizontal tilt to a <b>brightness&nbsp;%</b> and advertises that. The
+           <b>Smart Bulb</b> listens only to the hub and drives its light to that intensity. Nobody
+           opens a connection; every hop is a connectionless <b>BLE beacon</b> (advertising data).</p>
       </div>
       <div class="ex">
         <h4>What you can change</h4>
         <ul>
-          <li>Drag the Tilt sensor's <b>X / Y / Z</b> sliders - the orientation the firmware sees changes
-              live, as if the fixture were tilted.</li>
+          <li>Drag the Tilt sensor's <b>X / Y / Z</b> sliders - the orientation the firmware reads and
+              broadcasts changes live, and the <b>intensity</b> up top follows within a second.</li>
           <li>Hit <b>View code</b> on any card to read the exact firmware source and how it communicates.</li>
           <li>Compile your own image and <b>Upload .elf</b> to run it; <b>Default</b> reverts.</li>
         </ul>
@@ -250,18 +290,20 @@ const BULB = '<svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3
 // Per-node documentation, attached as its own div under each card's console so
 // a reader can figure out that board from the card alone.
 const DOCS = {
-  gateway:{title:'What this board does',
-    body:`<p>BLE <b>central</b>. On Start it powers on, <b>scans</b> the radio for the bulb,
-      <b>connects</b> over Bluetooth LE, then subscribes and prints every color-temperature update it
-      receives. Its badge walks through booting &rarr; scanning &rarr; connected &rarr; receiving data.</p>`},
-  heartrate:{title:'What this board does',
-    body:`<p>BLE <b>peripheral</b>. On Start it <b>advertises</b> a lighting service and waits for the hub,
-      then <b>streams</b> its color temperature once a second. Its badge walks through
-      booting &rarr; advertising &rarr; connected &rarr; streaming.</p>`},
   motion:{title:'What this board does',
-    body:`<p>No radio. It reads a 3-axis accelerometer over <b>SPI</b> to catch a fixture that's been
-      tilted, knocked, or pried off its mount. Drag the <b>X / Y / Z</b> sliders below to change the
-      orientation the firmware reads - live.</p>`}
+    body:`<p>Reads a 3-axis <b>ADXL372</b> accelerometer over <b>SPI</b> to catch a fixture that's been
+      tilted, knocked, or pried off its mount, then <b>broadcasts</b> the X/Y/Z reading as a
+      connectionless BLE beacon once a second. Drag the <b>X / Y / Z</b> sliders below to change the
+      orientation it reads &amp; broadcasts - live.</p>`},
+  gateway:{title:'What this board does',
+    body:`<p>The <b>brain</b>. A BLE <b>observer + broadcaster</b>: it listens for the Tilt Sensor's
+      beacon, maps the horizontal tilt magnitude to a <b>brightness 0-100%</b> (the "light
+      calculation"), and re-broadcasts that brightness as its own beacon for the bulb. Its badge shows
+      the live brightness it's computing.</p>`},
+  heartrate:{title:'What this board does',
+    body:`<p>The <b>light</b>. A BLE <b>observer</b>: it listens only for the Lighting Hub's brightness
+      beacon and drives its LED to that <b>intensity</b> - printing the live % and raising a
+      <b>tamper alert</b> when the fixture is knocked hard enough to demand full brightness.</p>`}
 };
 const MAXLINES = 250;
 let nodes = [];
@@ -306,7 +348,7 @@ function buildCard(n){
   if(n.sensor){
     const s = el('div','sensor');
     s.innerHTML =
-      `<div class="reading">Orientation <b id="read-${n.id}">0.00</b><span style="color:var(--muted)">g (X-axis)</span></div>`+
+      `<div class="reading">Last beacon <b id="read-${n.id}" style="font-size:15px">waiting…</b></div>`+
       ['X','Y','Z'].map(ax=>
         `<div class="axis"><label>${ax}</label>
            <input type="range" min="-10" max="10" step="1" value="0" data-axis="${ax}">
@@ -360,27 +402,124 @@ function pulseBulb(id){
   h.classList.remove('glow'); void h.offsetWidth; h.classList.add('glow');
 }
 
-// Updates the badge AND returns an explicit, human-readable event string the
-// first time a notable transition is seen (so the console reads like a log of
-// "this happened, then this happened").
+// ---- the live pipeline panel (Tilt Sensor -> Lighting Hub -> Smart Bulb) ----
+// Built from the three known nodes; each stage lights up as data flows through
+// it, and the last stage shows the bulb's live intensity.
+function buildFlow(){
+  const f = document.getElementById('flow'); if(!f) return;
+  f.innerHTML =
+    `<div class="flow-stage" id="fs-motion">
+       <div class="fs-ico">${ICONS.motion}</div>
+       <div class="fs-body">
+         <div class="fs-step">1 · Sensor reads</div>
+         <div class="fs-title">Tilt Sensor</div>
+         <div class="fs-sub">Reads the ADXL372 accelerometer over SPI</div>
+         <div class="fs-val" id="flow-tilt">waiting…</div>
+       </div>
+     </div>
+     <div class="flow-arrow" id="fa-1">
+       <div class="lbl">tilt beacon</div><div class="arw">&rarr;</div><div class="sub">BLE advertising</div>
+     </div>
+     <div class="flow-stage" id="fs-gateway">
+       <div class="fs-ico">${ICONS.gateway}</div>
+       <div class="fs-body">
+         <div class="fs-step">2 · Hub computes</div>
+         <div class="fs-title">Lighting Hub</div>
+         <div class="fs-sub">Maps horizontal tilt &rarr; a brightness %</div>
+         <div class="fs-val" id="flow-bright">waiting…</div>
+       </div>
+     </div>
+     <div class="flow-arrow" id="fa-2">
+       <div class="lbl">light beacon</div><div class="arw">&rarr;</div><div class="sub">BLE advertising</div>
+     </div>
+     <div class="flow-stage flow-bulb" id="fs-heartrate">
+       <div class="fs-ico" id="fs-bulb-ico">${ICONS.heartrate}</div>
+       <div class="fs-body">
+         <div class="fs-step">3 · Bulb lights up</div>
+         <div class="fs-title">Smart Bulb</div>
+         <div class="fs-sub">Drives its light to the received intensity</div>
+         <div class="intensity">
+           <span class="big" id="flow-intensity">&mdash;</span><span class="unit">%</span>
+           <div class="meter"><div class="meter-fill" id="flow-meter"></div></div>
+           <div class="tamper" id="flow-tamper">⚠ Fixture disturbed &mdash; full brightness</div>
+         </div>
+       </div>
+     </div>`;
+}
+function flowActivate(stage){
+  const s=document.getElementById('fs-'+stage); if(!s) return;
+  s.classList.add('active','pulse'); void s.offsetWidth;
+  s.classList.remove('pulse'); void s.offsetWidth; s.classList.add('pulse');
+}
+function flowArrow(id){
+  const a=document.getElementById(id); if(!a) return;
+  a.classList.add('active'); setTimeout(()=>a.classList.remove('active'),450);
+}
+function setTilt(x,y,z){
+  const e=document.getElementById('flow-tilt'); if(e) e.textContent=`X=${x}  Y=${y}  Z=${z}`;
+  flowActivate('motion'); flowArrow('fa-1');
+}
+function setHub(x,y,z,b){
+  const e=document.getElementById('flow-bright'); if(e) e.textContent=`${b}%  (from tilt ${x},${y},${z})`;
+  flowActivate('gateway'); flowArrow('fa-2');
+}
+function setIntensity(b){
+  const big=document.getElementById('flow-intensity'); if(big) big.textContent=b;
+  const m=document.getElementById('flow-meter'); if(m) m.style.width=b+'%';
+  const ico=document.getElementById('fs-bulb-ico');
+  if(ico){ const g=b/100; ico.style.filter = b>0?`drop-shadow(0 0 ${2+g*9}px rgba(63,130,104,${(.3+g*.6).toFixed(2)}))`:''; }
+  const t=document.getElementById('flow-tamper'); if(t) t.classList.toggle('on', b>=80);
+  flowActivate('heartrate');
+}
+function resetFlow(){
+  ['motion','gateway','heartrate'].forEach(s=>{const el=document.getElementById('fs-'+s); if(el) el.classList.remove('active','pulse');});
+  const tl=document.getElementById('flow-tilt'); if(tl) tl.textContent='waiting…';
+  const br=document.getElementById('flow-bright'); if(br) br.textContent='waiting…';
+  const big=document.getElementById('flow-intensity'); if(big) big.innerHTML='&mdash;';
+  const m=document.getElementById('flow-meter'); if(m) m.style.width='0';
+  const tp=document.getElementById('flow-tamper'); if(tp) tp.classList.remove('on');
+  const ico=document.getElementById('fs-bulb-ico'); if(ico) ico.style.filter='';
+}
+
+// Updates the badge and the pipeline, AND returns an explicit, human-readable
+// event string the first time a notable transition is seen (so the console
+// reads like a log of "this happened, then this happened"). The regexes match
+// the exact firmware output in firmware/src/{motion,gateway,heartrate}.c.
 function deriveStatus(id, line){
-  if(id==='gateway'){
-    if(/Booting/.test(line)){ badge(id,'booting…','busy'); return sysOnce(id,'boot','Lighting hub powered on - booting firmware'); }
-    if(/Scanning/.test(line)){ badge(id,'scanning…','busy'); return sysOnce(id,'scan','Scanning for nearby lighting fixtures…'); }
-    if(/Connected:/.test(line)){ badge(id,'connected','good'); return sysOnce(id,'conn','Connected to Smart Bulb over Bluetooth LE'); }
-    if(/\[NOTIFICATION\]/.test(line)){ badge(id,'receiving data','good'); pulseBulb('gateway'); return sysOnce(id,'notif','Subscribed - receiving live color-temperature updates'); }
-  } else if(id==='heartrate'){
-    if(/Booting/.test(line)){ badge(id,'booting…','busy'); return sysOnce(id,'boot','Smart bulb powered on - booting firmware'); }
-    if(/Advertising/.test(line)){ badge(id,'advertising…','busy'); return sysOnce(id,'adv','Advertising lighting service, waiting for the hub…'); }
-    if(/\bConnected\b/.test(line)){ badge(id,'connected','good'); pulseBulb('heartrate'); return sysOnce(id,'conn','Hub connected - link established'); }
-    if(/notification.*enabled/i.test(line)){ badge(id,'streaming','good'); return sysOnce(id,'stream','Notifications enabled - streaming color temperature'); }
-  } else if(id==='motion'){
-    if(/Booting/.test(line)){ badge(id,'booting…','busy'); return sysOnce(id,'boot','Tilt sensor powered on - booting firmware'); }
-    const m = line.match(/(-?\d+\.\d+)\s*g/);
+  if(id==='motion'){
+    if(/node starting/.test(line)){ badge(id,'booting…','busy'); return sysOnce(id,'boot','Tilt sensor powered on - booting firmware'); }
+    if(/Broadcasting tilt beacon/.test(line)){ badge(id,'broadcasting','good'); return sysOnce(id,'adv','Sensor online - broadcasting tilt over BLE'); }
+    const m = line.match(/SPI read\s+X=(-?\d+)\s+Y=(-?\d+)\s+Z=(-?\d+)/);
     if(m){
-      badge(id,'monitoring tilt','good');
-      const r=document.getElementById('read-motion'); if(r) r.textContent=m[1];
-      return sysOnce(id,'read','Reading accelerometer over SPI - watching for tilt & tamper');
+      badge(id,'reading SPI','good');
+      setTilt(m[1],m[2],m[3]);
+      const r=document.getElementById('read-motion'); if(r) r.textContent=`X=${m[1]} Y=${m[2]} Z=${m[3]}`;
+      return sysOnce(id,'read','Reading ADXL372 over SPI → broadcasting the X/Y/Z beacon');
+    }
+  } else if(id==='gateway'){
+    if(/node starting/.test(line)){ badge(id,'booting…','busy'); return sysOnce(id,'boot','Lighting hub powered on - booting firmware'); }
+    if(/relay online/.test(line)){ badge(id,'relay online','good'); return sysOnce(id,'relay','Relay online - listening for tilt, broadcasting light'); }
+    const m = line.match(/\[HUB\] tilt X=(-?\d+) Y=(-?\d+) Z=(-?\d+) -> brightness (\d+)%/);
+    if(m){
+      const b=+m[4];
+      badge(id,'brightness '+b+'%','good');
+      setHub(m[1],m[2],m[3],b);
+      return sysOnce(id,'calc','Computing brightness from the tilt → broadcasting it to the bulb');
+    }
+  } else if(id==='heartrate'){
+    if(/node starting/.test(line)){ badge(id,'booting…','busy'); return sysOnce(id,'boot','Smart bulb powered on - booting firmware'); }
+    if(/Listening for the hub/.test(line)){ badge(id,'listening…','busy'); return sysOnce(id,'listen','Listening for the hub\'s light beacon…'); }
+    const m = line.match(/Light intensity = (\d+)%\s+\(tilt magnitude (-?\d+)\)/);
+    if(m){
+      const b=+m[1];
+      badge(id,'intensity '+b+'%','good');
+      pulseBulb('heartrate');
+      setIntensity(b);
+      return sysOnce(id,'lit','Got the hub\'s brightness → driving the bulb to that intensity');
+    }
+    if(/driving to full brightness/.test(line)){
+      badge(id,'TAMPER · 100%','good');
+      return 'Fixture disturbed - driving the bulb to full brightness';
     }
   }
   return null;
@@ -396,10 +535,12 @@ function setRunning(running, phase){
   } else {
     dot.className='dot'; txt.textContent='Idle';
     for(const id in consoles) badge(id,'offline','');
+    resetFlow();
   }
 }
 
 function render(){
+  buildFlow();
   const grid=document.getElementById('grid'); grid.innerHTML='';
   nodes.forEach(n=>grid.appendChild(buildCard(n)));
   nodes.forEach(n=>setFw(n.id,n.firmware));
@@ -486,6 +627,7 @@ document.getElementById('startBtn').onclick=async()=>{
   clearError();
   setRunning(true,'starting');
   for(const id in consoles){consoles[id].lines=[];consoles[id].seen=new Set();consoles[id].el.textContent='';}
+  resetFlow();
   const r=await fetch(API+'/api/start',{method:'POST'});
   if(!r.ok){ const j=await r.json().catch(()=>({})); setRunning(false,'stopped'); showError(j.error||'Could not start the network.'); }
 };

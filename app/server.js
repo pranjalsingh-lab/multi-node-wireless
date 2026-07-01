@@ -50,12 +50,29 @@ const MONITOR_PORT = 33000;
 
 // The three virtual devices. Renode is an implementation detail and never
 // named in anything the client sees.
+// Ordered to match the data flow the UI tells left-to-right:
+// Tilt Sensor (reads SPI) -> Lighting Hub (computes brightness) -> Smart Bulb.
 const NODES = [
+  {
+    id: 'motion',
+    label: 'Tilt & Tamper Sensor',
+    role: 'Tilt & tamper · SPI accelerometer',
+    blurb: 'Reads a 3-axis accelerometer over SPI and broadcasts the fixture\'s X/Y/Z tilt over BLE. Drag the sliders to move it.',
+    uartPort: 33103,
+    ble: true,
+    sensor: true,
+    defaultFw: 'motion.elf',
+    src: 'motion.c',
+    sample: 'custom: tilt sensor (ADXL372 + BLE broadcaster)',
+    srcOrigin: 'Custom firmware: ADXL372 tilt sensor broadcast as a BLE beacon',
+    buildNote: 'The nRF52840 DK has no accelerometer by default, so a devicetree overlay declares an adi,adxl372 node on SPI - this lab wires it to spi2 with chip-select on gpio0 pin 22. Renode models the legacy (non-EasyDMA) SPI register interface, so the overlay uses compatible = "nordic,nrf-spi".',
+    comms: 'Reads a 3-axis ADXL372 accelerometer over the SPI bus (chip-select on gpio0 pin 22) to catch when a fixture is tilted, knocked, or pried off its mount, then broadcasts the X/Y/Z reading as a connectionless BLE beacon (manufacturer advertising data) once per second - the Lighting Hub listens for it. The X/Y/Z sliders in this UI write straight into the emulated sensor\'s registers, so the orientation the firmware reads (and broadcasts) changes live.',
+  },
   {
     id: 'gateway',
     label: 'Lighting Hub',
     role: 'Bluetooth LE · Hub',
-    blurb: 'Discovers nearby fixtures, links to them, and collects their live state.',
+    blurb: 'Listens for the sensor\'s tilt beacon, computes a brightness from the tilt, and re-broadcasts that to the bulb.',
     uartPort: 33101,
     ble: true,
     sensor: false,
@@ -69,7 +86,7 @@ const NODES = [
     id: 'heartrate',
     label: 'Smart Bulb',
     role: 'Bluetooth LE · Fixture',
-    blurb: 'Advertises a lighting service and streams its live color temperature.',
+    blurb: 'Listens for the hub\'s brightness beacon and drives its light to that intensity - full brightness when the fixture is disturbed.',
     uartPort: 33102,
     ble: true,
     sensor: false,
@@ -78,21 +95,6 @@ const NODES = [
     sample: 'custom: smart bulb (BLE observer)',
     srcOrigin: 'Custom firmware: BLE observer that lights up from the hub\'s brightness beacon',
     comms: 'BLE fixture. Listens (BLE observer) for the Lighting Hub\'s brightness beacon; whenever the value changes it prints its live light intensity and drives its LED - and calls out a tamper alert when the fixture is knocked hard enough to demand full brightness.',
-  },
-  {
-    id: 'motion',
-    label: 'Tilt & Tamper Sensor',
-    role: 'Tilt & tamper · SPI accelerometer',
-    blurb: 'Watches fixture orientation on a 3-axis accelerometer to catch tilt or tampering. Drag the sliders to move it.',
-    uartPort: 33103,
-    ble: true,
-    sensor: true,
-    defaultFw: 'motion.elf',
-    src: 'motion.c',
-    sample: 'custom: tilt sensor (ADXL372 + BLE broadcaster)',
-    srcOrigin: 'Custom firmware: ADXL372 tilt sensor broadcast as a BLE beacon',
-    buildNote: 'The nRF52840 DK has no accelerometer by default, so a devicetree overlay declares an adi,adxl372 node on SPI - this lab wires it to spi2 with chip-select on gpio0 pin 22. Renode models the legacy (non-EasyDMA) SPI register interface, so the overlay uses compatible = "nordic,nrf-spi".',
-    comms: 'BLE fixture with a sensor. It reads a 3-axis ADXL372 accelerometer over the SPI bus (chip-select on gpio0 pin 22) to catch when a fixture is tilted, knocked, or pried off its mount, then broadcasts the X/Y/Z reading as a connectionless BLE beacon (manufacturer advertising data) once per second - the Lighting Hub listens for it. The X/Y/Z sliders in this UI write straight into the emulated sensor\'s registers, so the orientation the firmware reads (and broadcasts) changes live.',
   },
 ];
 
