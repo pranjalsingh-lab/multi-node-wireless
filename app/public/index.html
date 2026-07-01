@@ -363,7 +363,7 @@ function buildCard(n){
   const card = el('div','card');
   const head = el('div','card-h');
   head.innerHTML =
-    `<div class="ico">${ICONS[n.id]||''}</div>
+    `<div class="ico" id="ico-${n.id}">${ICONS[n.id]||''}</div>
      <div style="flex:1;min-width:0">
        <h3>${n.label} ${n.id!=='motion'?'<span class="bulb" id="bulb-'+n.id+'">'+BULB+'</span>':''}</h3>
        <div class="role">${n.role}</div>
@@ -511,7 +511,29 @@ function setIntensity(b){
   const ico=document.getElementById('fs-bulb-ico');
   if(ico){ const g=b/100; ico.style.filter = b>0?`drop-shadow(0 0 ${2+g*9}px rgba(217,164,65,${(.35+g*.6).toFixed(2)}))`:''; }
   const t=document.getElementById('flow-tamper'); if(t) t.classList.toggle('on', b>=80);
+  setBulbGlow(b);
   flowActivate('heartrate');
+}
+
+// Make the big bulb icon on the Smart Bulb card (rightmost) glow amber in
+// proportion to the received brightness %; 0% leaves it in its resting state.
+function setBulbGlow(b){
+  const ico=document.getElementById('ico-heartrate'); if(!ico) return;
+  const svg=ico.querySelector('svg');
+  if(!(b>0)){
+    ico.style.background=''; ico.style.borderColor=''; ico.style.boxShadow='';
+    if(svg){ svg.style.stroke=''; svg.style.fill=''; svg.style.filter=''; }
+    return;
+  }
+  const g=Math.min(100,b)/100;
+  ico.style.background=`rgba(245,158,11,${(0.06+g*0.24).toFixed(3)})`;
+  ico.style.borderColor=`rgba(245,158,11,${(0.2+g*0.55).toFixed(3)})`;
+  ico.style.boxShadow=`0 0 ${Math.round(6+g*26)}px rgba(245,158,11,${(0.15+g*0.5).toFixed(3)}), inset 0 0 ${Math.round(4+g*14)}px rgba(245,158,11,${(0.1+g*0.35).toFixed(3)})`;
+  if(svg){
+    svg.style.stroke='var(--green-dk)';
+    svg.style.fill=`rgba(245,158,11,${(g*0.9).toFixed(3)})`;
+    svg.style.filter=`drop-shadow(0 0 ${Math.round(2+g*9)}px rgba(245,158,11,${(0.4+g*0.5).toFixed(3)}))`;
+  }
 }
 function resetFlow(){
   ['motion','gateway','heartrate'].forEach(s=>{const el=document.getElementById('fs-'+s); if(el) el.classList.remove('active','pulse');});
@@ -521,6 +543,7 @@ function resetFlow(){
   const m=document.getElementById('flow-meter'); if(m) m.style.width='0';
   const tp=document.getElementById('flow-tamper'); if(tp) tp.classList.remove('on');
   const ico=document.getElementById('fs-bulb-ico'); if(ico) ico.style.filter='';
+  setBulbGlow(0);
 }
 
 // Updates the badge and the pipeline, AND returns an explicit, human-readable
@@ -561,6 +584,7 @@ function deriveStatus(id, line){
     }
     if(/driving to full brightness/.test(line)){
       badge(id,'TAMPER · 100%','good');
+      setBulbGlow(100);
       return 'Fixture disturbed - driving the bulb to full brightness';
     }
   }
