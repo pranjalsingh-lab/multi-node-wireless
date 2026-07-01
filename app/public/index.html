@@ -15,10 +15,11 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);
     color:var(--txt);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif;min-height:100vh}
-  header{display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;
-    padding:18px 28px;border-bottom:1px solid var(--line);position:sticky;top:0;
+  header{display:flex;flex-direction:row;align-items:center;justify-content:flex-end;
+    flex-wrap:wrap;gap:12px 22px;
+    padding:12px 28px;border-bottom:1px solid var(--line);position:sticky;top:0;
     background:rgba(236,238,240,.85);backdrop-filter:blur(8px);z-index:5}
-  .brand{display:flex;align-items:center;justify-content:center;gap:12px}
+  .brand{display:flex;align-items:center;gap:11px;text-align:left}
   h1{font-size:16px;margin:0;letter-spacing:-.2px;font-weight:650}
   .sub{color:var(--muted);font-size:12px;margin-top:1px}
   .controls{display:flex;align-items:center;gap:12px}
@@ -38,7 +39,7 @@
   .wrap{max-width:1280px;margin:0 auto;padding:24px 28px 60px}
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:18px}
   .card{background:var(--panel);border:1px solid var(--line);
-    border-radius:14px;overflow:hidden;display:flex;flex-direction:column;min-height:430px}
+    border-radius:14px;overflow:hidden;display:flex;flex-direction:column;min-height:560px}
   .card-h{display:flex;align-items:flex-start;gap:13px;padding:16px 16px 12px}
   .ico{width:40px;height:40px;border-radius:10px;flex:none;display:grid;place-items:center;
     background:var(--chip);border:1px solid var(--line)}
@@ -71,7 +72,7 @@
   .console{flex:1;margin:0 16px;background:var(--con-bg);border:1px solid var(--con-line);border-radius:10px;
     font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;line-height:1.55;
     color:var(--con-txt);padding:10px 12px;overflow:auto;white-space:pre-wrap;word-break:break-word;
-    min-height:150px;max-height:230px}
+    min-height:210px;max-height:340px}
   .console .ln{display:block}
   .console .sys{color:var(--con-sys);font-weight:600}
   .console .sys::before{content:"› "}
@@ -82,19 +83,23 @@
   .axis label{width:16px;color:var(--muted);font-weight:600}
   .axis input[type=range]{flex:1;accent-color:var(--green)}
   .axis .val{width:48px;text-align:right;font-family:ui-monospace,monospace;color:var(--txt)}
-  .foot{margin-top:30px;color:var(--faint);font-size:11.5px;text-align:center}
-  .foot code{background:var(--chip);padding:1px 5px;border-radius:4px}
-  /* explanation panel */
-  .explain{margin-top:30px;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-  .explain>summary{cursor:pointer;list-style:none;user-select:none;
-    display:flex;align-items:center;gap:10px;padding:16px 22px;font-size:15px;font-weight:650;color:var(--txt)}
-  .explain>summary::-webkit-details-marker{display:none}
-  .explain>summary .chev{margin-left:auto;color:var(--muted);font-size:13px;font-weight:600;transition:transform .15s}
-  .explain[open]>summary .chev{transform:rotate(90deg)}
-  .explain>summary .tagi{font-size:11px;font-weight:600;color:var(--green-dk);background:var(--green-bg);
-    border:1px solid var(--green-line);border-radius:999px;padding:2px 9px}
-  .ex-body{padding:2px 22px 22px}
-  .ex-lead{color:var(--muted);font-size:13px;line-height:1.6;margin:0 0 18px;max-width:90ch}
+  /* hero ("what's happening") + howto panels - both are cards */
+  .hero,.howto{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:20px 22px;display:block;overflow:hidden}
+  .hero{margin:0 0 18px}
+  .hero h2{margin:0 0 9px;font-size:17px;font-weight:680;letter-spacing:-.2px}
+  .hero p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.65;max-width:104ch}
+  .hero b{color:var(--txt);font-weight:600}
+  .howto{margin:18px 0 0}
+  .howto h2{margin:0 0 14px;font-size:16px;font-weight:680;letter-spacing:-.2px}
+  /* per-card documentation block (attached under each board's console) */
+  .card-doc{margin:12px 16px 4px;padding:11px 13px;background:var(--chip);
+    border:1px solid var(--line);border-radius:10px}
+  .card-doc h4{margin:0 0 5px;font-size:12px;font-weight:650;color:var(--txt);
+    display:flex;align-items:center;gap:7px}
+  .card-doc h4::before{content:"";width:7px;height:7px;border-radius:2px;background:var(--green);flex:none}
+  .card-doc p{margin:0;color:var(--muted);font-size:12px;line-height:1.55}
+  .card-doc b{color:var(--txt);font-weight:600}
   .ex-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px}
   .ex h4{margin:0 0 7px;font-size:13px;font-weight:650;color:var(--txt);display:flex;align-items:center;gap:8px}
   .ex h4::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--green);flex:none}
@@ -168,59 +173,39 @@
 <div class="wrap">
   <div id="errbar" class="errbar hidden"></div>
 
+  <section class="hero">
+    <h2>What's happening here</h2>
+    <p>This lab boots <b>three virtual Nordic nRF52840 boards</b> and runs real firmware on emulated
+       hardware - there are no physical fixtures anywhere. Press <b>Start</b> and the <b>Smart Bulb</b>
+       advertises a lighting service, the <b>Lighting Hub</b> finds it and connects over a
+       <b>virtual Bluetooth LE link</b>, and live color-temperature readings begin flowing. A third board
+       watches a fixture's accelerometer for tilt or tampering. Each card below is one board's live serial
+       console - read it to see exactly what that firmware is doing.</p>
+  </section>
+
   <div class="grid" id="grid"></div>
 
-  <details class="explain" open>
-    <summary>How this works <span class="tagi">read me</span> <span class="chev">▸</span></summary>
-    <div class="ex-body">
-      <p class="ex-lead">
-        This lab boots <span class="k">three virtual Nordic nRF52840 boards</span> and runs real firmware on
-        emulated hardware - there are no physical fixtures anywhere. A lighting hub talks to a smart bulb over a
-        <span class="k">virtual Bluetooth LE link</span>; a third board watches a fixture's accelerometer for tilt
-        or tampering. Each card shows that node's live serial console, exactly what the firmware prints.
-      </p>
-      <div class="ex-grid">
-        <div class="ex">
-          <h4>The three nodes</h4>
-          <ul>
-            <li><b>Lighting Hub</b> - BLE central. Scans the air, connects to the bulb, and collects its live readings.</li>
-            <li><b>Smart Bulb</b> - BLE peripheral. Advertises a lighting service and streams its color temperature.</li>
-            <li><b>Tilt &amp; Tamper Sensor</b> - reads a 3-axis accelerometer over SPI to catch a knocked or tilted fixture. No radio.</li>
-          </ul>
-        </div>
-        <div class="ex">
-          <h4>When you press Start</h4>
-          <ol>
-            <li>All three boards power on and boot their firmware.</li>
-            <li>The bulb starts <b>advertising</b>; the hub starts <b>scanning</b>.</li>
-            <li>They find each other and <b>connect</b> over Bluetooth LE.</li>
-            <li>The hub subscribes and <b>color-temperature updates</b> begin flowing.</li>
-            <li>The tilt sensor reads its accelerometer on a loop.</li>
-          </ol>
-          <p style="margin-top:7px">Expect this to settle within a few seconds.</p>
-        </div>
-        <div class="ex">
-          <h4>Reading the consoles</h4>
-          <p>
-            Each dark box is the raw serial output of one board. The green
-            <span class="k">&rsaquo; lines</span> are plain-language milestones we add on top
-            (&ldquo;connected&rdquo;, &ldquo;streaming&hellip;&rdquo;) so you can follow along without parsing every line.
-            The badge top-right of each card tracks that node's current state.
-          </p>
-        </div>
-        <div class="ex">
-          <h4>Things to try</h4>
-          <ul>
-            <li>Drag the sensor's <b>X / Y / Z</b> sliders - the orientation the firmware sees changes live, as if the fixture were tilted.</li>
-            <li>Hit <b>View code</b> to read the exact firmware source and how it communicates.</li>
-            <li>Compile your own image and <b>Upload .elf</b> to run it; <b>Default</b> reverts.</li>
-          </ul>
-        </div>
+  <section class="howto">
+    <h2>How to read &amp; tweak it</h2>
+    <div class="ex-grid">
+      <div class="ex">
+        <h4>What you're seeing</h4>
+        <p>Each dark box is the raw serial output of one board. The green
+           <span class="k">&rsaquo; lines</span> are plain-language milestones we add on top
+           (&ldquo;connected&rdquo;, &ldquo;streaming&hellip;&rdquo;) so you can follow along without parsing
+           every line. The badge at the top-right of each card tracks that node's current state.</p>
+      </div>
+      <div class="ex">
+        <h4>What you can change</h4>
+        <ul>
+          <li>Drag the Tilt sensor's <b>X / Y / Z</b> sliders - the orientation the firmware sees changes
+              live, as if the fixture were tilted.</li>
+          <li>Hit <b>View code</b> on any card to read the exact firmware source and how it communicates.</li>
+          <li>Compile your own image and <b>Upload .elf</b> to run it; <b>Default</b> reverts.</li>
+        </ul>
       </div>
     </div>
-  </details>
-
-  <div class="foot">Everything runs on virtual hardware in your browser session - no boards, no wires, no flashing.</div>
+  </section>
 </div>
 
 <div id="modal" class="modal hidden">
@@ -262,6 +247,22 @@ const ICONS = {
 };
 // Small glowing bulb shown beside the radio nodes; pulses when data flows.
 const BULB = '<svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.55.42.9 1.06.96 1.75l.04.45h5.2l.04-.45c.06-.69.41-1.33.96-1.75A6 6 0 0 0 12 3z"/></svg>';
+// Per-node documentation, attached as its own div under each card's console so
+// a reader can figure out that board from the card alone.
+const DOCS = {
+  gateway:{title:'What this board does',
+    body:`<p>BLE <b>central</b>. On Start it powers on, <b>scans</b> the radio for the bulb,
+      <b>connects</b> over Bluetooth LE, then subscribes and prints every color-temperature update it
+      receives. Its badge walks through booting &rarr; scanning &rarr; connected &rarr; receiving data.</p>`},
+  heartrate:{title:'What this board does',
+    body:`<p>BLE <b>peripheral</b>. On Start it <b>advertises</b> a lighting service and waits for the hub,
+      then <b>streams</b> its color temperature once a second. Its badge walks through
+      booting &rarr; advertising &rarr; connected &rarr; streaming.</p>`},
+  motion:{title:'What this board does',
+    body:`<p>No radio. It reads a 3-axis accelerometer over <b>SPI</b> to catch a fixture that's been
+      tilted, knocked, or pried off its mount. Drag the <b>X / Y / Z</b> sliders below to change the
+      orientation the firmware reads - live.</p>`}
+};
 const MAXLINES = 250;
 let nodes = [];
 const consoles = {};   // id -> {el, lines:[{t,k}], seen:Set}
@@ -294,6 +295,13 @@ function buildCard(n){
   const con = el('div','console');
   con.id = 'con-'+n.id;
   card.appendChild(con);
+
+  const doc = DOCS[n.id];
+  if(doc){
+    const d = el('div','card-doc');
+    d.innerHTML = `<h4>${doc.title}</h4>${doc.body}`;
+    card.appendChild(d);
+  }
 
   if(n.sensor){
     const s = el('div','sensor');
