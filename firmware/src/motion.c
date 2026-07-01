@@ -1,115 +1,96 @@
 /*
- * Copyright (c) 2018 Analog Devices Inc.
+ * Tilt & Tamper Sensor node.
+ *
+ * Reads a 3-axis ADXL372 accelerometer over SPI (the sensor is wired to this
+ * board) and broadcasts the live X/Y/Z tilt as a connectionless BLE beacon
+ * (manufacturer-specific advertising data). The Lighting Hub listens for it.
+ *
+ * Connectionless broadcast is used instead of a GATT connection because the
+ * emulated radio models advertising/scanning far more robustly than it models
+ * multiple simultaneous connections.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
-#include <drivers/sensor.h>
-#include <stdio.h>
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/drivers/sensor.h>
 
-#define pow2(x) ((x) * (x))
+#include <zephyr/bluetooth/bluetooth.h>
 
-#if !DT_HAS_COMPAT_STATUS_OKAY(adi_adxl372)
-#error "No adi,adxl372 compatible node found in the device tree"
-#endif
+/* Beacon framing: [company id LE (2)][type][payload].  0xFFFF is the "no
+ * company" test id; type 'T' marks a tilt reading from this sensor. */
+#define TILTLAB_COMPANY_0  0xFF
+#define TILTLAB_COMPANY_1  0xFF
+#define BEACON_TYPE_TILT   'T'
 
-static double sqrt(double value)
+/* payload = int16 X, Y, Z (little-endian), hundredths of m/s^2 */
+static uint8_t mfg[9] = { TILTLAB_COMPANY_0, TILTLAB_COMPANY_1, BEACON_TYPE_TILT };
+
+static struct bt_data ad[] = {
+	BT_DATA(BT_DATA_MANUFACTURER_DATA, mfg, sizeof(mfg)),
+};
+
+/* m/s^2 sensor_value -> signed hundredths of m/s^2 (integer only, no libm). */
+static int16_t sv_to_centi(const struct sensor_value *v)
 {
-	int i;
-	double sqrt = value / 3;
+	return (int16_t)(v->val1 * 100 + v->val2 / 10000);
+}
 
-	if (value <= 0) {
+static const struct device *const accel = DEVICE_DT_GET_ANY(adi_adxl372);
+
+int main(void)
+{
+	int err;
+
+	printk("Tilt sensor node starting\n");
+
+	if (!device_is_ready(accel)) {
+		printk("ADXL372 not ready\n");
 		return 0;
 	}
 
-	for (i = 0; i < 6; i++) {
-		sqrt = (sqrt + value / sqrt) / 2;
+	err = bt_enable(NULL);
+	if (err) {
+		printk("Bluetooth init failed (err %d)\n", err);
+		return 0;
 	}
+	printk("Bluetooth initialized\n");
 
-	return sqrt;
-}
-
-K_SEM_DEFINE(sem, 0, 1);
-
-static void trigger_handler(const struct device *dev,
-			    const struct sensor_trigger *trigger)
-{
-	ARG_UNUSED(trigger);
-
-	if (sensor_sample_fetch(dev)) {
-		printf("sensor_sample_fetch failed\n");
-		return;
+	/* Non-connectable beacon; we refresh its payload every read. */
+	err = bt_le_adv_start(BT_LE_ADV_NCONN, ad, ARRAY_SIZE(ad), NULL, 0);
+	if (err) {
+		printk("Advertising failed to start (err %d)\n", err);
+		return 0;
 	}
-
-	k_sem_give(&sem);
-}
-
-void main(void)
-{
-	struct sensor_value accel[3];
-	double mag;
-	int i;
-	char meter[200];
-
-	const struct device *dev = DEVICE_DT_GET_ANY(adi_adxl372);
-
-	if (!device_is_ready(dev)) {
-		printf("Device %s is not ready\n", dev->name);
-		return;
-	}
-
-	struct sensor_trigger trig = {
-		.type = SENSOR_TRIG_DATA_READY,
-		.chan = SENSOR_CHAN_ACCEL_XYZ,
-	};
-
-	if (IS_ENABLED(CONFIG_ADXL372_PEAK_DETECT_MODE)) {
-		trig.type = SENSOR_TRIG_THRESHOLD;
-	}
-
-	if (IS_ENABLED(CONFIG_ADXL372_TRIGGER)) {
-		if (sensor_trigger_set(dev, &trig, trigger_handler)) {
-			printf("Could not set trigger\n");
-			return;
-		}
-	}
+	printk("Broadcasting tilt beacon\n");
 
 	while (1) {
-		if (IS_ENABLED(CONFIG_ADXL372_TRIGGER)) {
-			if (IS_ENABLED(CONFIG_ADXL372_PEAK_DETECT_MODE)) {
-				printf("Waiting for a threshold event\n");
-			}
-			k_sem_take(&sem, K_FOREVER);
-		} else {
-			if (sensor_sample_fetch(dev)) {
-				printf("sensor_sample_fetch failed\n");
-			}
+		struct sensor_value a[3];
+		int16_t x, y, z;
+
+		if (sensor_sample_fetch(accel) < 0 ||
+		    sensor_channel_get(accel, SENSOR_CHAN_ACCEL_XYZ, a) < 0) {
+			printk("sensor read failed\n");
+			k_sleep(K_MSEC(1000));
+			continue;
 		}
 
-		sensor_channel_get(dev, SENSOR_CHAN_ACCEL_XYZ, accel);
+		x = sv_to_centi(&a[0]);
+		y = sv_to_centi(&a[1]);
+		z = sv_to_centi(&a[2]);
 
-		if (IS_ENABLED(CONFIG_ADXL372_PEAK_DETECT_MODE)) {
-			mag = sqrt(pow2(sensor_ms2_to_g(&accel[0])) +
-				pow2(sensor_ms2_to_g(&accel[1])) +
-				pow2(sensor_ms2_to_g(&accel[2])));
+		sys_put_le16(x, &mfg[3]);
+		sys_put_le16(y, &mfg[5]);
+		sys_put_le16(z, &mfg[7]);
 
-			for (i = 0; i <= mag && i < (sizeof(meter) - 1); i++) {
-				meter[i] = '#';
-			}
+		printk("SPI read  X=%d Y=%d Z=%d (0.01 m/s^2) -> beacon\n", x, y, z);
+		bt_le_adv_update_data(ad, ARRAY_SIZE(ad), NULL, 0);
 
-			meter[i] = '\0';
-
-			printf("%6.2f g: %s\n", mag, meter);
-		} else {
-			printf("AX=%10.2f AY=%10.2f AZ=%10.2f (m/s^2)\n",
-				sensor_value_to_double(&accel[0]),
-				sensor_value_to_double(&accel[1]),
-				sensor_value_to_double(&accel[2]));
-		}
-
-		if (!IS_ENABLED(CONFIG_ADXL372_TRIGGER)) {
-			k_sleep(K_MSEC(2000));
-		}
+		k_sleep(K_MSEC(1000));
 	}
+
+	return 0;
 }

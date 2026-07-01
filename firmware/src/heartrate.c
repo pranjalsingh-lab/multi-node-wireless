@@ -1,306 +1,103 @@
-/* main.c - Application main entry point */
-
 /*
- * Copyright (c) 2024 Nordic Semiconductor ASA
- * Copyright (c) 2015-2016 Intel Corporation
+ * Smart Bulb (light fixture) node.
+ *
+ * A BLE observer that listens for the Lighting Hub's light beacon and drives
+ * its LED / prints its live intensity from the brightness the hub computed.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <zephyr/kernel.h>
 #include <zephyr/device.h>
-#include <zephyr/devicetree.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/drivers/gpio.h>
 
 #include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/services/bas.h>
-#include <zephyr/bluetooth/services/hrs.h>
 
-static bool hrf_ntf_enabled;
+#define TILTLAB_COMPANY_0  0xFF
+#define TILTLAB_COMPANY_1  0xFF
+#define BEACON_TYPE_LIGHT  'L'
 
-static const struct bt_data ad[] = {
-	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
-	BT_DATA_BYTES(BT_DATA_UUID16_ALL,
-		      BT_UUID_16_ENCODE(BT_UUID_HRS_VAL),
-		      BT_UUID_16_ENCODE(BT_UUID_BAS_VAL),
-		      BT_UUID_16_ENCODE(BT_UUID_DIS_VAL)),
-#if defined(CONFIG_BT_EXT_ADV)
-	BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
-#endif /* CONFIG_BT_EXT_ADV */
-};
-
-#if !defined(CONFIG_BT_EXT_ADV)
-static const struct bt_data sd[] = {
-	BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
-};
-#endif /* !CONFIG_BT_EXT_ADV */
-
-enum {
-	STATE_CONNECTED,
-	STATE_DISCONNECTED,
-
-	STATE_BITS,
-};
-
-static ATOMIC_DEFINE(state, STATE_BITS);
-
-static void connected(struct bt_conn *conn, uint8_t err)
-{
-	if (err) {
-		printk("Connection failed, err 0x%02x %s\n", err, bt_hci_err_to_str(err));
-	} else {
-		printk("Connected\n");
-
-		(void)atomic_set_bit(state, STATE_CONNECTED);
-	}
-}
-
-static void disconnected(struct bt_conn *conn, uint8_t reason)
-{
-	printk("Disconnected, reason 0x%02x %s\n", reason, bt_hci_err_to_str(reason));
-
-	(void)atomic_set_bit(state, STATE_DISCONNECTED);
-}
-
-BT_CONN_CB_DEFINE(conn_callbacks) = {
-	.connected = connected,
-	.disconnected = disconnected,
-};
-
-static void hrs_ntf_changed(bool enabled)
-{
-	hrf_ntf_enabled = enabled;
-
-	printk("HRS notification status changed: %s\n",
-	       enabled ? "enabled" : "disabled");
-}
-
-static struct bt_hrs_cb hrs_cb = {
-	.ntf_changed = hrs_ntf_changed,
-};
-
-static void auth_cancel(struct bt_conn *conn)
-{
-	printk("Pairing cancelled: %s\n", bt_conn_dst_str(conn));
-}
-
-static struct bt_conn_auth_cb auth_cb_display = {
-	.cancel = auth_cancel,
-};
-
-static void bas_notify(void)
-{
-	uint8_t battery_level = bt_bas_get_battery_level();
-
-	battery_level--;
-
-	if (!battery_level) {
-		battery_level = 100U;
-	}
-
-	bt_bas_set_battery_level(battery_level);
-}
-
-static void hrs_notify(void)
-{
-	static uint8_t heartrate = 90U;
-
-	/* Heartrate measurements simulation */
-	heartrate++;
-	if (heartrate == 160U) {
-		heartrate = 90U;
-	}
-
-	if (hrf_ntf_enabled) {
-		bt_hrs_notify(heartrate);
-	}
-}
-
-#if defined(CONFIG_GPIO)
-/* The devicetree node identifier for the "led0" alias. */
 #define LED0_NODE DT_ALIAS(led0)
+static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET_OR(LED0_NODE, gpios, {0});
 
-#if DT_NODE_HAS_STATUS_OKAY(LED0_NODE)
-#include <zephyr/drivers/gpio.h>
-#define HAS_LED     1
-static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
-#define BLINK_ONOFF K_MSEC(500)
+/* De-dupe: only print when the intensity actually changes. */
+static int last_brightness = -1;
 
-static struct k_work_delayable blink_work;
-static bool                  led_is_on;
-
-static void blink_timeout(struct k_work *work)
+static void apply_brightness(uint8_t pct)
 {
-	led_is_on = !led_is_on;
-	gpio_pin_set(led.port, led.pin, (int)led_is_on);
-
-	k_work_schedule(&blink_work, BLINK_ONOFF);
-}
-
-static int blink_setup(void)
-{
-	int err;
-
-	printk("Checking LED device...");
-	if (!gpio_is_ready_dt(&led)) {
-		printk("failed.\n");
-		return -EIO;
+	if (led.port) {
+		/* No PWM on the modelled board - LED is on above a floor. */
+		gpio_pin_set_dt(&led, pct > 0 ? 1 : 0);
 	}
-	printk("done.\n");
+}
 
-	printk("Configuring GPIO pin...");
-	err = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
-	if (err) {
-		printk("failed.\n");
-		return -EIO;
+static bool on_ad(struct bt_data *data, void *user_data)
+{
+	const uint8_t *d = data->data;
+	uint8_t brightness;
+	int16_t mag;
+
+	if (data->type != BT_DATA_MANUFACTURER_DATA || data->data_len < 6) {
+		return true;
 	}
-	printk("done.\n");
+	if (d[0] != TILTLAB_COMPANY_0 || d[1] != TILTLAB_COMPANY_1 ||
+	    d[2] != BEACON_TYPE_LIGHT) {
+		return true;
+	}
 
-	k_work_init_delayable(&blink_work, blink_timeout);
+	brightness = d[3];
+	mag = (int16_t)sys_get_le16(&d[4]);
 
-	return 0;
+	if (brightness != last_brightness) {
+		last_brightness = brightness;
+		printk("Light intensity = %u%%  (tilt magnitude %d)\n",
+		       brightness, mag);
+		if (brightness >= 80) {
+			printk("  -> fixture disturbed: driving to full brightness\n");
+		}
+		apply_brightness(brightness);
+	}
+
+	return false;
 }
 
-static void blink_start(void)
+static void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
+		    struct net_buf_simple *ad)
 {
-	printk("Start blinking LED...\n");
-	led_is_on = false;
-	gpio_pin_set(led.port, led.pin, (int)led_is_on);
-	k_work_schedule(&blink_work, BLINK_ONOFF);
+	bt_data_parse(ad, on_ad, NULL);
 }
-
-static void blink_stop(void)
-{
-	struct k_work_sync work_sync;
-
-	printk("Stop blinking LED.\n");
-	k_work_cancel_delayable_sync(&blink_work, &work_sync);
-
-	/* Keep LED on */
-	led_is_on = true;
-	gpio_pin_set(led.port, led.pin, (int)led_is_on);
-}
-#endif /* LED0_NODE */
-#endif /* CONFIG_GPIO */
 
 int main(void)
 {
 	int err;
+	struct bt_le_scan_param scan_param = {
+		.type = BT_LE_SCAN_TYPE_PASSIVE,
+		.options = BT_LE_SCAN_OPT_NONE,
+		.interval = BT_GAP_SCAN_FAST_INTERVAL,
+		.window = BT_GAP_SCAN_FAST_WINDOW,
+	};
+
+	printk("Smart bulb node starting\n");
+
+	if (led.port && gpio_is_ready_dt(&led)) {
+		gpio_pin_configure_dt(&led, GPIO_OUTPUT_INACTIVE);
+	}
 
 	err = bt_enable(NULL);
 	if (err) {
 		printk("Bluetooth init failed (err %d)\n", err);
 		return 0;
 	}
-
 	printk("Bluetooth initialized\n");
 
-	bt_conn_auth_cb_register(&auth_cb_display);
-
-	bt_hrs_cb_register(&hrs_cb);
-
-#if !defined(CONFIG_BT_EXT_ADV)
-	printk("Starting Legacy Advertising (connectable and scannable)\n");
-	err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+	err = bt_le_scan_start(&scan_param, scan_cb);
 	if (err) {
-		printk("Advertising failed to start (err %d)\n", err);
+		printk("Scan failed to start (err %d)\n", err);
 		return 0;
 	}
-
-#else /* CONFIG_BT_EXT_ADV */
-	struct bt_le_adv_param adv_param = {
-		.id = BT_ID_DEFAULT,
-		.sid = 0U,
-		.secondary_max_skip = 0U,
-		.options = (BT_LE_ADV_OPT_EXT_ADV | BT_LE_ADV_OPT_CONN | BT_LE_ADV_OPT_CODED),
-		.interval_min = BT_GAP_ADV_FAST_INT_MIN_2,
-		.interval_max = BT_GAP_ADV_FAST_INT_MAX_2,
-		.peer = NULL,
-	};
-	struct bt_le_ext_adv *adv;
-
-	printk("Creating a Coded PHY connectable non-scannable advertising set\n");
-	err = bt_le_ext_adv_create(&adv_param, NULL, &adv);
-	if (err) {
-		printk("Failed to create Coded PHY extended advertising set (err %d)\n", err);
-
-		printk("Creating a non-Coded PHY connectable non-scannable advertising set\n");
-		adv_param.options &= ~BT_LE_ADV_OPT_CODED;
-		err = bt_le_ext_adv_create(&adv_param, NULL, &adv);
-		if (err) {
-			printk("Failed to create extended advertising set (err %d)\n", err);
-			return 0;
-		}
-	}
-
-	printk("Setting extended advertising data\n");
-	err = bt_le_ext_adv_set_data(adv, ad, ARRAY_SIZE(ad), NULL, 0);
-	if (err) {
-		printk("Failed to set extended advertising data (err %d)\n", err);
-		return 0;
-	}
-
-	printk("Starting Extended Advertising (connectable non-scannable)\n");
-	err = bt_le_ext_adv_start(adv, BT_LE_EXT_ADV_START_DEFAULT);
-	if (err) {
-		printk("Failed to start extended advertising set (err %d)\n", err);
-		return 0;
-	}
-#endif /* CONFIG_BT_EXT_ADV */
-
-	printk("Advertising successfully started\n");
-
-#if defined(HAS_LED)
-	err = blink_setup();
-	if (err) {
-		return 0;
-	}
-
-	blink_start();
-#endif /* HAS_LED */
-
-	/* Implement notification. */
-	while (1) {
-		k_sleep(K_SECONDS(1));
-
-		/* Heartrate measurements simulation */
-		hrs_notify();
-
-		/* Battery level simulation */
-		bas_notify();
-
-		if (atomic_test_and_clear_bit(state, STATE_CONNECTED)) {
-			/* Connected callback executed */
-
-#if defined(HAS_LED)
-			blink_stop();
-#endif /* HAS_LED */
-		} else if (atomic_test_and_clear_bit(state, STATE_DISCONNECTED)) {
-#if !defined(CONFIG_BT_EXT_ADV)
-			printk("Starting Legacy Advertising (connectable and scannable)\n");
-			err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, ad, ARRAY_SIZE(ad), sd,
-					      ARRAY_SIZE(sd));
-			if (err) {
-				printk("Advertising failed to start (err %d)\n", err);
-				return 0;
-			}
-
-#else /* CONFIG_BT_EXT_ADV */
-			printk("Starting Extended Advertising (connectable and non-scannable)\n");
-			err = bt_le_ext_adv_start(adv, BT_LE_EXT_ADV_START_DEFAULT);
-			if (err) {
-				printk("Failed to start extended advertising set (err %d)\n", err);
-				return 0;
-			}
-#endif /* CONFIG_BT_EXT_ADV */
-
-#if defined(HAS_LED)
-			blink_start();
-#endif /* HAS_LED */
-		}
-	}
+	printk("Listening for the hub's light beacon\n");
 
 	return 0;
 }

@@ -61,9 +61,9 @@ const NODES = [
     sensor: false,
     defaultFw: 'gateway.elf',
     src: 'gateway.c',
-    sample: 'samples/bluetooth/central_hr',
-    srcOrigin: 'Zephyr sample: samples/bluetooth/central_hr',
-    comms: 'BLE hub. Enables Bluetooth and actively scans the radio for fixtures advertising the lighting service. When it hears the Smart Bulb it connects, discovers the streaming characteristic, subscribes for notifications, and prints every "[NOTIFICATION]" it receives - that subscription is the live color-temperature feed you see flowing in. (Under the hood the demo carries this over the standard BLE Heart-Rate notify profile - UUID 0x180D / 0x2A37 - because that profile is the one mapped in our emulated radio; pointing it at a real lighting characteristic is a one-line UUID change.)',
+    sample: 'custom: lighting hub (BLE observer + broadcaster)',
+    srcOrigin: 'Custom firmware: BLE relay that turns tilt beacons into brightness beacons',
+    comms: 'BLE hub - the "brain" between the sensor and the light. It listens for the Tilt sensor\'s beacons and, for every X/Y/Z reading, computes a brightness (the horizontal-tilt magnitude mapped to 0-100%) and re-broadcasts that brightness as its own beacon for the Smart Bulb to pick up. It uses connectionless BLE (advertising + scanning) rather than a live connection, which the emulated radio handles far more reliably - swap the calculation to change how tilt drives the fixture.',
   },
   {
     id: 'heartrate',
@@ -75,9 +75,9 @@ const NODES = [
     sensor: false,
     defaultFw: 'heartrate.elf',
     src: 'heartrate.c',
-    sample: 'samples/bluetooth/peripheral_hr',
-    srcOrigin: 'Zephyr sample: samples/bluetooth/peripheral_hr',
-    comms: 'BLE fixture. Advertises the lighting service (plus Battery and Device-Information) and waits for the hub to connect. Once the hub enables notifications, it streams its current color-temperature setting - cycling through the tunable-white range - once per second. (The demo carries this over the standard BLE Heart-Rate notify profile as a stand-in transport: it is the profile mapped in our emulated radio, and a real product would expose the same value on a lighting characteristic.)',
+    sample: 'custom: smart bulb (BLE observer)',
+    srcOrigin: 'Custom firmware: BLE observer that lights up from the hub\'s brightness beacon',
+    comms: 'BLE fixture. Listens (BLE observer) for the Lighting Hub\'s brightness beacon; whenever the value changes it prints its live light intensity and drives its LED - and calls out a tamper alert when the fixture is knocked hard enough to demand full brightness.',
   },
   {
     id: 'motion',
@@ -85,14 +85,14 @@ const NODES = [
     role: 'Tilt & tamper · SPI accelerometer',
     blurb: 'Watches fixture orientation on a 3-axis accelerometer to catch tilt or tampering. Drag the sliders to move it.',
     uartPort: 33103,
-    ble: false,
+    ble: true,
     sensor: true,
     defaultFw: 'motion.elf',
     src: 'motion.c',
-    sample: 'samples/sensor/adxl372',
-    srcOrigin: 'Zephyr sample: samples/sensor/adxl372',
-    buildNote: 'The nRF52840 DK has no accelerometer by default, so add a devicetree overlay (e.g. boards/nrf52840dk_nrf52840.overlay) that declares an adi,adxl372 node on an SPI bus - this lab wires it to spi2 with chip-select on gpio0 pin 22.',
-    comms: 'Sensor node - no radio. It reads a 3-axis ADXL372 accelerometer over the SPI bus (chip-select on gpio0 pin 22) to catch when a fixture is tilted, knocked, or pried off its mount: it fetches a sample, reads the X/Y/Z channels and prints them. The X/Y/Z sliders in this UI write straight into the emulated sensor\'s registers, so the orientation the firmware reads changes live.',
+    sample: 'custom: tilt sensor (ADXL372 + BLE broadcaster)',
+    srcOrigin: 'Custom firmware: ADXL372 tilt sensor broadcast as a BLE beacon',
+    buildNote: 'The nRF52840 DK has no accelerometer by default, so a devicetree overlay declares an adi,adxl372 node on SPI - this lab wires it to spi2 with chip-select on gpio0 pin 22. Renode models the legacy (non-EasyDMA) SPI register interface, so the overlay uses compatible = "nordic,nrf-spi".',
+    comms: 'BLE fixture with a sensor. It reads a 3-axis ADXL372 accelerometer over the SPI bus (chip-select on gpio0 pin 22) to catch when a fixture is tilted, knocked, or pried off its mount, then broadcasts the X/Y/Z reading as a connectionless BLE beacon (manufacturer advertising data) once per second - the Lighting Hub listens for it. The X/Y/Z sliders in this UI write straight into the emulated sensor\'s registers, so the orientation the firmware reads (and broadcasts) changes live.',
   },
 ];
 
@@ -174,13 +174,17 @@ function buildResc() {
     } else {
       L.push('machine LoadPlatformDescription @platforms/cpus/nrf52840.repl');
     }
+    // The nodes talk over connectionless BLE beacons (advertising/scanning),
+    // which the emulated radio handles far more robustly than live connections.
     if (n.ble) L.push('connector Connect sysbus.radio wireless');
     L.push(`emulation CreateServerSocketTerminal ${n.uartPort} "term_${n.id}" false`);
     L.push(`connector Connect sysbus.uart0 term_${n.id}`);
     L.push('');
   }
-  // BLE link layer is timing-sensitive; tight quantum keeps the nodes in sync.
+  // BLE is timing-sensitive; a tight quantum plus lockstep execution keeps the
+  // three nodes in sync so scanners reliably catch each beacon.
   L.push('emulation SetGlobalQuantum "0.00001"');
+  L.push('emulation SetGlobalSerialExecution true');
   L.push('');
   L.push('macro reset');
   L.push('"""');
