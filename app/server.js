@@ -419,6 +419,9 @@ app.post('/api/start', async (req, res) => {
 
 app.post('/api/stop', async (req, res) => {
   await stopEmulation();
+  // `?reset=1` (used on a fresh page load) also wipes the console history so every
+  // refresh starts from a clean, stopped slate rather than replaying the last run.
+  if (req.query.reset) { for (const n of NODES) state.rings[n.id] = []; }
   res.json({ ok: true });
 });
 
