@@ -1,0 +1,42 @@
+/*
+ * The nRF52840 DK has no on-board accelerometer, so declare an ADXL372 on
+ * SPI2 with chip-select on gpio0 pin 22 - matching how the Renode platform
+ * wires the modelled sensor (adxl372: Sensors.ADXL372 @ spi2, gpio0 22 ->
+ * adxl372@0).
+ */
+
+&pinctrl {
+	spi2_default_alt: spi2_default_alt {
+		group1 {
+			psels = <NRF_PSEL(SPIM_SCK, 0, 17)>,
+				<NRF_PSEL(SPIM_MOSI, 0, 18)>,
+				<NRF_PSEL(SPIM_MISO, 0, 19)>;
+		};
+	};
+
+	spi2_sleep_alt: spi2_sleep_alt {
+		group1 {
+			psels = <NRF_PSEL(SPIM_SCK, 0, 17)>,
+				<NRF_PSEL(SPIM_MOSI, 0, 18)>,
+				<NRF_PSEL(SPIM_MISO, 0, 19)>;
+			low-power-enable;
+		};
+	};
+};
+
+&spi2 {
+	/* Renode's NRF52840_SPI models the legacy (non-EasyDMA) SPI register
+	 * interface, so use nordic,nrf-spi rather than nordic,nrf-spim. */
+	compatible = "nordic,nrf-spi";
+	status = "okay";
+	pinctrl-0 = <&spi2_default_alt>;
+	pinctrl-1 = <&spi2_sleep_alt>;
+	pinctrl-names = "default", "sleep";
+	cs-gpios = <&gpio0 22 GPIO_ACTIVE_LOW>;
+
+	adxl372: adxl372@0 {
+		compatible = "adi,adxl372";
+		reg = <0>;
+		spi-max-frequency = <8000000>;
+	};
+};

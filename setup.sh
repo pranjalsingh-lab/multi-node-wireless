@@ -28,12 +28,16 @@ else
   echo "!! (Continuing to fetch firmware + deps so the rest is ready.)"
 fi
 
-# --- 2. Default firmware images (small, ~8 MB total) ------------------------
-echo "==> Downloading default firmware images…"
+# --- 2. Default firmware images --------------------------------------------
+# This repo now ships its own custom firmware (the tilt -> hub -> bulb beacon
+# relay, see docs/13). Those ELFs are committed under firmware/defaults/, so we
+# only fall back to the upstream stock samples for any image that is missing -
+# never overwrite the committed custom firmware.
+echo "==> Ensuring default firmware images are present…"
 mkdir -p firmware/defaults firmware/uploads
-curl -L --retry 3 "$DL/nrf52840--zephyr-bluetooth_central_hr.elf-s_3380332-316e27f81dcda3c2b0e7f2c3516001e7b27ad051"   -o firmware/defaults/gateway.elf
-curl -L --retry 3 "$DL/nrf52840--zephyr-bluetooth_peripheral_hr.elf-s_3217940-7b59adc9629f8be90067b131e663a13d2d4bb711" -o firmware/defaults/heartrate.elf
-curl -L --retry 3 "$DL/nrf52840--zephyr_adxl372_spi.elf-s_993780-1dedb945dae92c07f1b4d955719bfb1f1e604173"            -o firmware/defaults/motion.elf
+[ -f firmware/defaults/gateway.elf ]   || curl -L --retry 3 "$DL/nrf52840--zephyr-bluetooth_central_hr.elf-s_3380332-316e27f81dcda3c2b0e7f2c3516001e7b27ad051"   -o firmware/defaults/gateway.elf
+[ -f firmware/defaults/heartrate.elf ] || curl -L --retry 3 "$DL/nrf52840--zephyr-bluetooth_peripheral_hr.elf-s_3217940-7b59adc9629f8be90067b131e663a13d2d4bb711" -o firmware/defaults/heartrate.elf
+[ -f firmware/defaults/motion.elf ]    || curl -L --retry 3 "$DL/nrf52840--zephyr_adxl372_spi.elf-s_993780-1dedb945dae92c07f1b4d955719bfb1f1e604173"            -o firmware/defaults/motion.elf
 
 # --- 3. App deps ------------------------------------------------------------
 echo "==> Installing web app dependencies…"
